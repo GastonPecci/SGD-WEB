@@ -12,6 +12,7 @@ from uuid import uuid4
 from sqlalchemy import func
 from collections import defaultdict
 
+
 main = Blueprint('main', __name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'))
 
 def generar_token(email):
@@ -126,6 +127,26 @@ def login():
                     return redirect(url_for('main.index'))
         
     return render_template('login.html')
+
+@main.route("/admin/ranking_tbody")
+def ranking_tbody():
+    hace_un_mes = datetime.now() - timedelta(days=30)
+    
+    ranking = (
+        db.session.query(
+            User.nombre,
+            User.apellido,
+            func.count(Reserva.id).label("total")
+        )
+        .join(Reserva, Reserva.user_id == User.id)
+        .filter(Reserva.fecha >= hace_un_mes)
+        .group_by(User.id)
+        .order_by(func.count(Reserva.id).desc())
+        .limit(20)  # top 20
+        .all()
+    )
+
+    return render_template("partials/ranking_tbody.html", ranking=ranking)
 
 @main.route('/admin/usuario/<int:user_id>.json')
 def admin_get_usuario(user_id):

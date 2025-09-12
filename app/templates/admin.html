@@ -130,6 +130,9 @@
         </li>
         <li class="nav-item">
             <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">📌 Reserva Manual</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="ranking-tab" data-bs-toggle="tab" data-bs-target="#ranking" type="button" role="tab">🏆 Ranking</button>
         </li>        
         <li class="nav-item">
             <button class="nav-link" id="canchas-tab" data-bs-toggle="tab" data-bs-target="#canchas" type="button" role="tab">🏟 Canchas</button>
@@ -246,6 +249,7 @@
             </ul>
         </div>
         {% endif %}
+
         <!--  Reserva Manual -->
         {% if user.is_admin or user.is_staff %}
         <div class="tab-pane fade" id="manual" role="tabpanel">
@@ -310,7 +314,25 @@
         <div id="mensajeReserva" class="alert d-none"></div>
         {% endif %}
         
-
+        <!-- 🏆 Ranking -->
+         <div class="tab-pane fade" id="ranking" role="tabpanel">
+            <h4 class="mb-3">Usuarios con más reservas (últimos 30 días)</h4>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Apellido</th>
+                            <th>Total Reservas</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaRanking">
+                        <!-- Se carga dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
         <!-- 👥 Usuarios -->
          {% if user.is_admin or user.is_staff %}
         <div class="tab-pane fade" id="usuarios" role="tabpanel">
@@ -486,86 +508,107 @@
     </div>        
 </body>
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  // Elementos UI (hora simple y múltiple)
-  const horaSelect   = document.getElementById("hora_select");
-  const horaMultiple = document.getElementById("hora_multiple");
 
-  // Intentá obtener los inputs de MANUAL por id y, si no existen, por name dentro del tab #manual
-  function getManualInputs() {
-    const canchaEl = document.getElementById("manual_cancha") || document.querySelector("#manual select[name='cancha_id']");
-    const fechaEl  = document.getElementById("manual_fecha")  || document.querySelector("#manual input[name='fecha']");
-    return { canchaEl, fechaEl };
-  }
-
-  const HORAS_TODAS = [
-                       '14:00','15:00','16:00','17:00','18:00','19:00',
-                       '20:00','21:00','22:00','23:00','00:00','01:00'];
-
-  function resetearSelects() {
-    if (horaSelect)   horaSelect.innerHTML   = '<option value="">Seleccioná hora</option>';
-    if (horaMultiple) horaMultiple.innerHTML = '';
-  }
-
-  async function actualizarHoras() {
-    const { canchaEl, fechaEl } = getManualInputs();
-    if (!canchaEl || !fechaEl) {
-      console.warn("No se encontraron los inputs de cancha/fecha dentro del tab #manual");
-      resetearSelects();
-      return;
+    async function actualizarRanking() {
+    const res = await fetch('/admin/ranking_tbody');
+    document.getElementById('tablaRanking').innerHTML = await res.text();
     }
 
-    const canchaId = canchaEl.value;
-    const fecha    = fechaEl.value;
-    if (!canchaId || !fecha) {
-      resetearSelects();
-      return;
-    }
-
-    try {
-      const resp = await fetch("/horas_disponibles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cancha_id: canchaId, fecha })
-      });
-      const ocupadas = await resp.json();
-
-      resetearSelects();
-
-      // Normalizá por si backend trae "8:00" en vez de "08:00"
-      const ocupadasSet = new Set(
-        (Array.isArray(ocupadas) ? ocupadas : []).map(h => (h.length === 4 ? "0" + h : h))
-      );
-
-      HORAS_TODAS.forEach(h => {
-        if (!ocupadasSet.has(h)) {
-          if (horaSelect)   horaSelect.add(new Option(h, h));
-          if (horaMultiple) horaMultiple.add(new Option(h, h));
+    document.addEventListener("DOMContentLoaded", () => {
+        // actualizar ranking al abrir la pestaña
+        const rankingTabBtn = document.getElementById("ranking-tab");
+        if (rankingTabBtn) {
+            rankingTabBtn.addEventListener("shown.bs.tab", actualizarRanking);
         }
-      });
-    } catch (e) {
-      console.error("Error cargando horas:", e);
-      resetearSelects();
+
+        // refrescar cada 60 segundos
+        setInterval(() => {
+            if (document.getElementById("ranking").classList.contains("active")) {
+                actualizarRanking();
+            }
+        }, 60000);
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+    // Elementos UI (hora simple y múltiple)
+    const horaSelect   = document.getElementById("hora_select");
+    const horaMultiple = document.getElementById("hora_multiple");
+
+    // Intentá obtener los inputs de MANUAL por id y, si no existen, por name dentro del tab #manual
+    function getManualInputs() {
+        const canchaEl = document.getElementById("manual_cancha") || document.querySelector("#manual select[name='cancha_id']");
+        const fechaEl  = document.getElementById("manual_fecha")  || document.querySelector("#manual input[name='fecha']");
+        return { canchaEl, fechaEl };
     }
-  }
 
-  // Hacerla global para cualquier otro código que quiera llamarla
-  window.actualizarHoras = actualizarHoras;
+    const HORAS_TODAS = [
+                        '14:00','15:00','16:00','17:00','18:00','19:00',
+                        '20:00','21:00','22:00','23:00','00:00','01:00'];
 
-  // Enganchar eventos SOLO de la pestaña Manual
-  const { canchaEl, fechaEl } = getManualInputs();
-  if (canchaEl) canchaEl.addEventListener("change", actualizarHoras);
-  if (fechaEl)  fechaEl.addEventListener("change", actualizarHoras);
+    function resetearSelects() {
+        if (horaSelect)   horaSelect.innerHTML   = '<option value="">Seleccioná hora</option>';
+        if (horaMultiple) horaMultiple.innerHTML = '';
+    }
 
-  // Al mostrar la pestaña "Reserva Manual", refrescar horas
-  const manualTabBtn = document.getElementById("manual-tab");
-  if (manualTabBtn) {
-    manualTabBtn.addEventListener("shown.bs.tab", actualizarHoras);
-  }
+    async function actualizarHoras() {
+        const { canchaEl, fechaEl } = getManualInputs();
+        if (!canchaEl || !fechaEl) {
+        console.warn("No se encontraron los inputs de cancha/fecha dentro del tab #manual");
+        resetearSelects();
+        return;
+        }
 
-  // Intento inicial (por si ya hay valores cargados)
-  actualizarHoras();
-});
+        const canchaId = canchaEl.value;
+        const fecha    = fechaEl.value;
+        if (!canchaId || !fecha) {
+        resetearSelects();
+        return;
+        }
+
+        try {
+        const resp = await fetch("/horas_disponibles", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cancha_id: canchaId, fecha })
+        });
+        const ocupadas = await resp.json();
+
+        resetearSelects();
+
+        // Normalizá por si backend trae "8:00" en vez de "08:00"
+        const ocupadasSet = new Set(
+            (Array.isArray(ocupadas) ? ocupadas : []).map(h => (h.length === 4 ? "0" + h : h))
+        );
+
+        HORAS_TODAS.forEach(h => {
+            if (!ocupadasSet.has(h)) {
+            if (horaSelect)   horaSelect.add(new Option(h, h));
+            if (horaMultiple) horaMultiple.add(new Option(h, h));
+            }
+        });
+        } catch (e) {
+        console.error("Error cargando horas:", e);
+        resetearSelects();
+        }
+    }
+
+    // Hacerla global para cualquier otro código que quiera llamarla
+    window.actualizarHoras = actualizarHoras;
+
+    // Enganchar eventos SOLO de la pestaña Manual
+    const { canchaEl, fechaEl } = getManualInputs();
+    if (canchaEl) canchaEl.addEventListener("change", actualizarHoras);
+    if (fechaEl)  fechaEl.addEventListener("change", actualizarHoras);
+
+    // Al mostrar la pestaña "Reserva Manual", refrescar horas
+    const manualTabBtn = document.getElementById("manual-tab");
+    if (manualTabBtn) {
+        manualTabBtn.addEventListener("shown.bs.tab", actualizarHoras);
+    }
+
+    // Intento inicial (por si ya hay valores cargados)
+    actualizarHoras();
+    });
 </script>
 
 <script> 

@@ -2,6 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
 from dotenv import load_dotenv
+from flask_migrate import Migrate
 import os
 
 # Cargar las variables del archivo .env
