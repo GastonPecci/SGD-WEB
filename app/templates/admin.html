@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Panel de Administración</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: url('{{ url_for('static', filename='SGD-WEB.png') }}')no-repeat center center fixed;
+            font-family: 'Poppins', sans-serif;
+            background-size: cover;
+            color: #fff;
+            
+        }
+
+        .bg-overlay {
+        background: rgba(0, 0, 0, 0.75);
+        padding: 25px;
+        border-radius: 15px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        max-width: 1100px;
+        width: 100%;
+        min-height: 800px;
+    }
+
+        .nav-tabs {
+        border-bottom: none;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+    .nav-tabs .nav-link {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        margin: 0 5px;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+    }
+    .nav-tabs .nav-link.active {
+        background: #0d6efd;
+        color: #fff;
+        font-weight: bold;
+    }
+    .nav-tabs .nav-link:hover {
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+    }
+    table {
+        background: rgba(255,255,255,0.05);
+        color: #fff;
+    }
+    table th {
+        background: rgba(0,0,0,0.5);
+    }
+    table td, table th {
+        border-color: rgba(255,255,255,0.1);
+    }
+    input, select, textarea {
+        background: white !important;
+        color: #252525 !important;
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    input::placeholder {
+        color: rgba(255, 255, 255, 0.8);
+    }
+    .btn {
+        border-radius: 8px;
+        margin: 2px;
+    }
+    .footer-bottom{
+        margin-top: 20px;
+    }
+        @media (min-width: 768px) {
+            .btn-custom {
+                width: auto;
+                font-size: 1.2rem;
+            }
+
+            h2 {
+                font-size: 2.8rem;
+            }
+
+            h4 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body class="p-4">
+
+<div class="bg-overlay">
+    <h2 class="text-center mb-4">⚙️ Panel de Administración</h2>
+    <div class="d-flex justify-content-center flex-wrap mb-4">
+                <a href="{{ url_for('main.login') }}" class="btn btn-danger btn-custom">
+                    🔒 Cerrar sesión
+                </a>
+                <a href="{{ url_for('main.agenda') }}" class="btn btn-info btn-custom">
+                    📅 Ver Agenda
+                </a>
+    </div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Pestañas -->
+     {% if user.is_admin or user.is_staff %}
+    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" id="reservas-tab" data-bs-toggle="tab" data-bs-target="#reservas" type="button" role="tab">📋 Reservas</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">📌 Reserva Manual</button>
+        </li>        
+        <li class="nav-item">
+            <button class="nav-link" id="canchas-tab" data-bs-toggle="tab" data-bs-target="#canchas" type="button" role="tab">🏟 Canchas</button>
+        </li>        
+        <li class="nav-item">
+            <button class="nav-link" id="usuarios-tab" data-bs-toggle="tab" data-bs-target="#usuarios" type="button" role="tab">👥 Usuarios</button>
+        </li>        
+    </ul>
+    {% endif %}
+
+
+    <div class="tab-content mt-3">
+
+        <!-- 📋 Reservas -->
+        {% if user.is_admin or user.is_staff %}
+        <div class="tab-pane fade  show active" id="reservas" role="tabpanel">
+            <form id="filtroFecha" class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <input type="date" name="fecha" class="form-control" value="{{ request.args.get('fecha', '') }}">
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary">Filtrar</button>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <a href="{{ url_for('main.admin') }}" class="btn btn-secondary">Quitar filtro</a>
+                </div>
+            </form>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Cancha</th>
+                            <th>Fecha</th>
+                            <th>Hora</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaReservas">
+                        {% for r in reservas %}
+                        <tr>
+                            <td>{{ r.user.nombre }} {{ r.user.apellido }}</td>
+                            <td>{{ r.cancha.nombre }}</td>
+                            <td>{{ r.fecha.strftime('%d/%m/%Y') }}</td>
+                            <td>{{ r.horas }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                <button type="button"
+                                        class="btn btn-danger btn-sm"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalEliminarReserva"
+                                        data-user="{{ r.user.id }}"
+                                        data-cancha="{{ r.cancha.id }}"
+                                        data-fecha="{{ r.fecha.strftime('%Y-%m-%d') }}">
+                                    Eliminar
+                                </button>
+                                {% else %}
+                                    <span class="badge bg-secondary">Solo lectura</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 🏟 Canchas -->
+        {% if user.is_admin or user.is_staff %}
+        <div class="tab-pane fade" id="canchas" role="tabpanel">
+            <h4 class="mb-3">Agregar Cancha</h4>
+            {% if user.is_admin %}             
+            <form method="POST" action="{{ url_for('main.agregar_cancha') }}" class="row g-3 mb-4">
+                <div class="col-md-5">
+                    <input type="text" class="form-control" name="nombre" placeholder="Nombre" required>
+                </div>
+                <div class="col-md-5">
+                    <input type="text" class="form-control" name="detalle" placeholder="Descripción" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Agregar</button>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-warning">
+                ⚠️ Solo lectura: los empleados pueden ver canchas, pero no modificarlas.
+            </div>
+            {% endif %}
+
+            <h4>Canchas Existentes</h4>
+            <ul class="list-group">
+                {% for cancha in canchas %}
+                <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent text-white">
+                    <div>
+                        <b>{{ cancha.nombre }}</b> - {{ cancha.detalle }}
+                    </div>
+                    <div>
+                        {% if user.is_admin %}
+                        <button type="button" class="btn btn-sm btn-outline-info me-1" style="margin-right:2px"
+                            data-bs-toggle="modal" data-bs-target="#modalEditarCancha"
+                            data-id="{{ cancha.id }}" data-nombre="{{ cancha.nombre }}" data-detalle="{{ cancha.detalle }}">
+                            Editar
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" style="margin-left:2px"
+                            data-bs-toggle="modal" data-bs-target="#modalEliminarCancha"
+                            data-id="{{ cancha.id }}">Eliminar</button>
+                        {% else %}
+                        <span class="text-muted">Solo lectura</span>
+                        {% endif %}
+                    </div>
+                </li>                
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        <!--  Reserva Manual -->
+        {% if user.is_admin or user.is_staff %}
+        <div class="tab-pane fade" id="manual" role="tabpanel">
+            <h4 class="mb-3">Agendar Reserva Usuario</h4>
+            <div class="col-md-6">
+                <input type="text" class="form-control" id="busquedaCliente" placeholder="Nombre y Apellido" required>
+            </div>
+            <br>
+            <h4 class="mb-3">📌Agendar Reserva Usuario Nuevo</h4>
+            <form method="POST" action="{{ url_for('main.reserva_manual') }}" id="formReservaManual" class="row g-3">
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="nombre" placeholder="Nombre" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="apellido" placeholder="Apellido" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" name="telefono" placeholder="Teléfono" required>
+                </div>
+                <div class="col-md-3">
+                    <input type="email" class="form-control" name="email" placeholder="Email">
+                </div>
+                <div class="col-md-4">
+                    <select id="manual_cancha" name="cancha_id" class="form-control" required>
+                        <option value="">Seleccionar Cancha</option>
+                        {% for cancha in canchas %}
+                            <option value="{{ cancha.id }}">{{ cancha.nombre }} - {{ cancha.detalle}}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <input type="date" id="manual_fecha" class="form-control" name="fecha" required>
+                </div>
+                <div class="col-md-4">
+                    <select id="tipo_reserva" name="tipo_reserva" class="form-select" required>
+                        <option value="una">Una hora</option>
+                        <option value="varias">Varias horas</option>
+                        <option value="dia">Día entero</option>
+                    </select>
+                </div>
+
+                <!-- Selector de una sola hora -->
+                <div class="col-md-4" id="bloque_una">
+                    <select id="hora_select" name="hora" class="form-select">
+                        <option value="">Seleccioná una cancha y fecha</option>
+                    </select>
+                </div>
+
+                <!-- Selector múltiple de horas -->
+                <div class="col-md-8 d-none" id="bloque_varias">
+                    <label class="form-label">Seleccioná varias horas</label>
+                    <select id="hora_multiple" name="horas[]" class="form-select" multiple>
+                        <!-- se cargan dinámicamente -->
+                    </select>
+                    <small class="text-light">Usá CTRL o SHIFT para elegir varias</small>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-success w-100">Crear Reserva</button>
+                </div>
+            </form>
+        </div>
+        <div id="mensajeReserva" class="alert d-none"></div>
+        {% endif %}
+        
+
+        <!-- 👥 Usuarios -->
+         {% if user.is_admin or user.is_staff %}
+        <div class="tab-pane fade" id="usuarios" role="tabpanel">
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <input type="text" class="form-control mb-2" id="buscarUsuario" placeholder="Buscar usuario...">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Apellido</th>
+                            <th>Teléfono</th>
+                            <th>Email</th>
+                            <th>Confirmado</th>
+                            <th>Admin</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaUsuarios">                    
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <div class="footer-bottom">
+            <a style="color: #ffffff;text-decoration: none;" href="https://api.whatsapp.com/send?phone=5493825576888&text=Hola me gustaria obtener mas información."><p> Copyright&copy; 2025 | SGD-Web. Todos los derechos reservados.</p></a>
+    </div>
+</div>
+
+<!-- Modal eliminar reserva -->
+    <div class="modal fade" id="modalEliminarReserva" tabindex="-1" aria-labelledby="modalEliminarReservaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="formEliminarReserva">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="modalEliminarReservaLabel">Confirmar eliminación</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body text-dark">
+            ⚠️ ¿Estás seguro de que querés eliminar esta reserva? Esta acción no se puede deshacer.
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-danger">Eliminar</button>
+            </div>
+        </div>
+        </form>
+    </div>
+    </div>
+    <!-- Modal Reserva Creada -->
+    <div class="modal fade" id="modalReservaCreada" tabindex="-1" aria-labelledby="modalReservaCreadaLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-success text-white">
+        <div class="modal-header">
+            <h5 class="modal-title" id="modalReservaCreadaLabel">✅ Reserva creada</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body text-center">
+            La reserva se ha registrado correctamente.
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Entendido</button>
+        </div>
+        </div>
+    </div>
+    </div>
+    <!-- Modal Editar Usuario -->
+    <div class="modal fade" id="modalEditarUsuario" tabindex="-1" aria-labelledby="modalEditarUsuarioLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="formEditarUsuario">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+            <h5 class="modal-title" id="modalEditarUsuarioLabel">Editar Usuario</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-dark">
+            <div class="row g-2">
+                <div class="col-md-6">
+                <label class="form-label">Nombre</label>
+                <input type="text" name="nombre" id="editU_Nombre" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                <label class="form-label">Apellido</label>
+                <input type="text" name="apellido" id="editU_Apellido" class="form-control" required>
+                </div>
+                <div class="col-md-6">
+                <label class="form-label">Teléfono</label>
+                <input type="text" name="telefono" id="editU_Telefono" class="form-control">
+                </div>
+                <div class="col-md-6">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" id="editU_Email" class="form-control" required>
+                </div>
+                <div class="col-12 mt-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="editU_Confirmado" name="confirmado">
+                    <label class="form-check-label" for="editU_Confirmado">Confirmado</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="editU_Admin" name="is_admin">
+                    <label class="form-check-label" for="editU_Admin">Administrador</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="editU_Bloqueado" name="bloqueado">
+                    <label class="form-check-label" for="editU_Bloqueado">Bloqueado</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="editU_Staff" name="is_staff">
+                    <label class="form-check-label" for="editU_Staff">Empleado (acceso limitado)</label>
+                </div>
+                </div>
+            </div>
+            <div id="editU_Msg" class="mt-2 d-none"></div>
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            </div>
+        </div>
+        </form>
+    </div>
+    </div>
+
+    <!-- Modal Editar Cancha -->
+    <div class="modal fade" id="modalEditarCancha" tabindex="-1" aria-labelledby="modalEditarCanchaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="POST" id="formEditarCancha">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+            <h5 class="modal-title" id="modalEditarCanchaLabel">Editar Cancha</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-dark">
+            <div class="mb-3">
+                <label class="form-label">Nombre</label>
+                <input type="text" class="form-control" name="nombre" id="editNombre" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Detalle</label>
+                <input type="text" class="form-control" name="detalle" id="editDetalle" required>
+            </div>
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            </div>
+        </div>
+        </form>
+    </div>
+    </div>
+    <!-- Modal Eliminar Cancha -->
+    <div class="modal fade" id="modalEliminarCancha" tabindex="-1" aria-labelledby="modalEliminarCanchaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form method="GET" id="formEliminarCancha">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="modalEliminarCanchaLabel">Advertencia</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-dark">
+            ⚠️ Si eliminas esta cancha, <b>todas las reservas asociadas se perderán</b> y esto podría generar errores.
+            <br><br>
+            ¿Estás seguro de continuar?
+            </div>
+            <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-danger">Eliminar igualmente</button>
+            </div>
+        </div>
+        </form>        
+    </div>
+    
+    </div>        
+</body>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // Elementos UI (hora simple y múltiple)
+  const horaSelect   = document.getElementById("hora_select");
+  const horaMultiple = document.getElementById("hora_multiple");
+
+  // Intentá obtener los inputs de MANUAL por id y, si no existen, por name dentro del tab #manual
+  function getManualInputs() {
+    const canchaEl = document.getElementById("manual_cancha") || document.querySelector("#manual select[name='cancha_id']");
+    const fechaEl  = document.getElementById("manual_fecha")  || document.querySelector("#manual input[name='fecha']");
+    return { canchaEl, fechaEl };
+  }
+
+  const HORAS_TODAS = [
+                       '14:00','15:00','16:00','17:00','18:00','19:00',
+                       '20:00','21:00','22:00','23:00','00:00','01:00'];
+
+  function resetearSelects() {
+    if (horaSelect)   horaSelect.innerHTML   = '<option value="">Seleccioná hora</option>';
+    if (horaMultiple) horaMultiple.innerHTML = '';
+  }
+
+  async function actualizarHoras() {
+    const { canchaEl, fechaEl } = getManualInputs();
+    if (!canchaEl || !fechaEl) {
+      console.warn("No se encontraron los inputs de cancha/fecha dentro del tab #manual");
+      resetearSelects();
+      return;
+    }
+
+    const canchaId = canchaEl.value;
+    const fecha    = fechaEl.value;
+    if (!canchaId || !fecha) {
+      resetearSelects();
+      return;
+    }
+
+    try {
+      const resp = await fetch("/horas_disponibles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cancha_id: canchaId, fecha })
+      });
+      const ocupadas = await resp.json();
+
+      resetearSelects();
+
+      // Normalizá por si backend trae "8:00" en vez de "08:00"
+      const ocupadasSet = new Set(
+        (Array.isArray(ocupadas) ? ocupadas : []).map(h => (h.length === 4 ? "0" + h : h))
+      );
+
+      HORAS_TODAS.forEach(h => {
+        if (!ocupadasSet.has(h)) {
+          if (horaSelect)   horaSelect.add(new Option(h, h));
+          if (horaMultiple) horaMultiple.add(new Option(h, h));
+        }
+      });
+    } catch (e) {
+      console.error("Error cargando horas:", e);
+      resetearSelects();
+    }
+  }
+
+  // Hacerla global para cualquier otro código que quiera llamarla
+  window.actualizarHoras = actualizarHoras;
+
+  // Enganchar eventos SOLO de la pestaña Manual
+  const { canchaEl, fechaEl } = getManualInputs();
+  if (canchaEl) canchaEl.addEventListener("change", actualizarHoras);
+  if (fechaEl)  fechaEl.addEventListener("change", actualizarHoras);
+
+  // Al mostrar la pestaña "Reserva Manual", refrescar horas
+  const manualTabBtn = document.getElementById("manual-tab");
+  if (manualTabBtn) {
+    manualTabBtn.addEventListener("shown.bs.tab", actualizarHoras);
+  }
+
+  // Intento inicial (por si ya hay valores cargados)
+  actualizarHoras();
+});
+</script>
+
+<script> 
+        
+        let usuarioSeleccionadoId = null;
+
+        async function actualizarUsuarios() {
+            const filtroActual = document.getElementById('buscarUsuario').value; // guardar filtro
+            const res = await fetch('/admin/usuarios_tbody');
+            document.getElementById('tablaUsuarios').innerHTML = await res.text();
+
+            // restaurar filtro y selección
+            document.getElementById('buscarUsuario').value = filtroActual;
+            aplicarFiltroYSeleccion();
+        }
+
+        async function actualizarReservas() {
+            const fecha = document.querySelector('#filtroFecha input[name="fecha"]').value;
+            let url = '/admin/reservas_tbody';
+            if (fecha) {
+                url = `/admin/filtrar_reservas?fecha=${encodeURIComponent(fecha)}`;
+            }
+            const res = await fetch(url);
+            document.getElementById('tablaReservas').innerHTML = await res.text();
+        }
+
+        // Aplica el filtro y selecciona la fila guardada
+        function aplicarFiltroYSeleccion() {
+            const filtro = document.getElementById('buscarUsuario').value.toLowerCase();
+            document.querySelectorAll('#tablaUsuarios tr').forEach(row => {
+                const coincide = row.innerText.toLowerCase().includes(filtro);
+                row.style.display = coincide ? '' : 'none';
+                if (usuarioSeleccionadoId && row.dataset.userId === usuarioSeleccionadoId) {
+                    row.classList.add('table-active');
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+
+        // Guardar ID al hacer clic
+        document.getElementById('tablaUsuarios').addEventListener('click', function(e) {
+            const fila = e.target.closest('tr');
+            if (!fila) return;
+            usuarioSeleccionadoId = fila.dataset.userId;
+            document.querySelectorAll('#tablaUsuarios tr').forEach(tr => tr.classList.remove('table-active'));
+            fila.classList.add('table-active');
+        });
+
+        // Buscar usuarios
+        document.getElementById('buscarUsuario').addEventListener('input', aplicarFiltroYSeleccion);
+
+        setInterval(() => {
+                actualizarUsuarios();
+                actualizarReservas();
+            }, 10000);
+            });
+
+            // Función busqueda de usuarios
+        document.getElementById('busquedaCliente').addEventListener('input', async function() {
+            let termino = this.value.trim();
+            if (termino.length >= 3) {
+                let res = await fetch(`/admin/buscar_usuario?termino=${encodeURIComponent(termino)}`);
+                if (res.ok) {
+                    let data = await res.json();
+                    if (data && Object.keys(data).length > 0) {
+                        document.querySelector('input[name="nombre"]').value = data.nombre || '';
+                        document.querySelector('input[name="apellido"]').value = data.apellido || '';
+                        document.querySelector('input[name="telefono"]').value = data.telefono || '';
+                        document.querySelector('input[name="email"]').value = data.email || '';
+                    }
+                }
+            }
+        });
+        document.addEventListener('DOMContentLoaded', () => {
+            const tbodyUsuarios = document.getElementById('tablaUsuarios');
+
+            // --- Delegación de eventos en el TBODY ---
+            tbodyUsuarios.addEventListener('click', async (ev) => {
+                const btnBloquear = ev.target.closest('.btn-bloquear');
+                const btnEditar = ev.target.closest('.btn-editar-usuario');
+                if (btnBloquear) {
+                const userId = btnBloquear.getAttribute('data-user-id');
+                const resp = await fetch(`/admin/bloquear_usuario/${userId}`, { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    await actualizarUsuarios(); // refresca sólo la tabla
+                } else {
+                    alert(data.message || 'Error al bloquear/desbloquear.');
+                }
+                return;
+                }
+                if (btnEditar) {
+                const userId = btnEditar.getAttribute('data-user-id');
+                // Traemos los datos del usuario actualizados
+                const resp = await fetch(`/admin/usuario/${userId}.json`);
+                const data = await resp.json();
+                if (!data.success) { alert('No se pudo cargar el usuario.'); return; }
+                // Llenar modal
+                document.getElementById('formEditarUsuario').setAttribute('action', `/admin/editar_usuario/${userId}`);
+                document.getElementById('editU_Staff').checked = !!data.is_staff;
+                document.getElementById('editU_Nombre').value = data.nombre || '';
+                document.getElementById('editU_Apellido').value = data.apellido || '';
+                document.getElementById('editU_Telefono').value = data.telefono || '';
+                document.getElementById('editU_Email').value = data.email || '';
+                document.getElementById('editU_Confirmado').checked = !!data.confirmado;
+                document.getElementById('editU_Admin').checked = !!data.is_admin;
+                document.getElementById('editU_Bloqueado').checked = !!data.bloqueado;
+                }
+            });
+        });
+            // --- Submit del modal Editar ---
+            document.getElementById('formEditarUsuario').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const resp = await fetch(form.getAttribute('action'), {
+                method: 'POST',
+                body: new FormData(form)
+                });
+                const data = await resp.json();
+                const msg = document.getElementById('editU_Msg');
+                if (data.success) {
+                msg.className = 'alert alert-success';
+                msg.textContent = 'Usuario actualizado';
+                await actualizarUsuarios(); // ver cambios en la tabla
+                // Cerrar modal a los 700ms
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalEditarUsuario'));
+                    modal && modal.hide();
+                    msg.className = 'd-none';
+                }, 700);
+                } else {
+                msg.className = 'alert alert-danger';
+                msg.textContent = data.message || 'Error al actualizar';
+                }
+            });       
+
+            
+
+        document.addEventListener('DOMContentLoaded', function () {
+        const modalEditar = document.getElementById('modalEditarCancha');
+        const formEditar = document.getElementById('formEditarCancha');
+
+        modalEditar.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const id = button.getAttribute('data-id');
+            const nombre = button.getAttribute('data-nombre');
+            const detalle = button.getAttribute('data-detalle');
+
+            document.getElementById('editNombre').value = nombre;
+            document.getElementById('editDetalle').value = detalle;
+            formEditar.action = `/admin/editar_cancha/${id}`;
+        });
+    });
+        document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('modalEliminarCancha');
+        const form = document.getElementById('formEliminarCancha');
+
+        modal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const canchaId = button.getAttribute('data-id');
+            form.action = `/admin/eliminar_cancha/${canchaId}`;
+        });
+    });
+        document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('modalEliminarReserva');
+        const form = document.getElementById('formEliminarReserva');
+
+        modal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            if (!button) return;
+            const userId = button.getAttribute('data-user');
+            const canchaId = button.getAttribute('data-cancha');
+            const fecha = button.getAttribute('data-fecha');
+
+            // Ajusta la ruta según tu Flask route
+            form.action = `/admin/eliminar_reserva_grupo/${userId}/${canchaId}/${fecha}`;
+        });
+        });
+
+
+    document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('filtroFecha');
+    const tabla = document.getElementById('tablaReservas');
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const fecha = form.querySelector('input[name="fecha"]').value;
+
+        const response = await fetch(`/admin/filtrar_reservas?fecha=${fecha}`);
+        const html = await response.text();
+
+        tabla.innerHTML = html;
+        });
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+    const tipoSelect = document.getElementById("tipo_reserva");
+    const bloqueUna = document.getElementById("bloque_una");
+    const bloqueVarias = document.getElementById("bloque_varias");
+    const horaSelect = document.getElementById("hora_select");
+    const horaMultiple = document.getElementById("hora_multiple");
+
+    tipoSelect.addEventListener("change", () => {
+        bloqueUna.classList.toggle("d-none", tipoSelect.value !== "una");
+        bloqueVarias.classList.toggle("d-none", tipoSelect.value !== "varias");
+    });    
+});
+
+    document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("formReservaManual");
+    const mensaje = document.getElementById("mensajeReserva");
+
+    form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    try {
+        const formData = new FormData(form);
+        const response = await fetch(form.action, {
+            method: "POST",
+            body: formData
+        });
+
+        const result = await response.json();
+
+        mensaje.textContent = result.message || '';
+        mensaje.className = `alert mt-3 text-center fw-bold alert-${result.success ? 'success' : 'danger'}`;
+        mensaje.classList.remove("d-none");
+
+        if (result.success) {
+            form.reset();
+            // refrescar tabla de reservas inmediatamente
+            await actualizarReservas();
+            // mostrar modal de confirmación
+            new bootstrap.Modal(document.getElementById('modalReservaCreada')).show();
+        }
+    } catch (err) {
+        console.error("Error en la reserva:", err);
+        mensaje.textContent = "Ocurrió un error al crear la reserva.";
+        mensaje.className = "alert alert-danger mt-3 text-center fw-bold";
+        mensaje.classList.remove("d-none");
+    }
+});
+
+});
+
+</script>
+
+</html>
