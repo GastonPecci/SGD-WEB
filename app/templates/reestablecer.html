@@ -80,10 +80,27 @@
         <form method="POST">
             <div class="mb-3">
                 <label for="password" class="form-label">Nueva Contraseña</label>
-                <input type="password" name="password" class="form-control" placeholder="Nueva contraseña" required>
-            </div>
+                <div class="input-group">
+                    <input type="password" id="password" name="password" class="form-control" required>
+                    <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                        👁️
+                    </button>
+                </div>
             <button type="submit" class="btn btn-success w-100">Guardar nueva contraseña</button>
         </form>
     </div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const togglePassword = document.getElementById("togglePassword");
+    const passwordInput = document.getElementById("password");
+
+    togglePassword.addEventListener("click", () => {
+        const isPassword = passwordInput.getAttribute("type") === "password";
+        passwordInput.setAttribute("type", isPassword ? "text" : "password");
+        togglePassword.textContent = isPassword ? "🙈" : "👁️"; 
+    });
+});
+</script>
+
 </body>
 </html>

@@ -77,7 +77,14 @@
         .alert {
             font-size: 0.95rem;
         }
-
+        .footer-bottom {
+            font-size: 0.85rem;
+            margin-top: 2rem;
+            opacity: 0.8;
+        }
+        .footer-bottom:hover {
+            opacity: 1;
+        }
         @media (min-width: 768px) {
             .bg-overlay {              
                 padding: 4rem;
@@ -99,7 +106,12 @@
             </div>
             <div class="mb-3 text-start">
                 <label for="password">Contraseña</label>
-                <input type="password" id="password" name="password" class="form-control" required>
+                <div class="input-group">
+                    <input type="password" id="password" name="password" class="form-control" required>
+                    <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                        👁️
+                    </button>
+                </div>
             </div>
             <button class="btn btn-primary btn-custom">Entrar</button>
             <div class="text-center mt-3">
@@ -143,6 +155,16 @@
       modal.show();
     }
   });
+  document.addEventListener("DOMContentLoaded", () => {
+    const togglePassword = document.getElementById("togglePassword");
+    const passwordInput = document.getElementById("password");
+
+    togglePassword.addEventListener("click", () => {
+        const isPassword = passwordInput.getAttribute("type") === "password";
+        passwordInput.setAttribute("type", isPassword ? "text" : "password");
+        togglePassword.textContent = isPassword ? "🙈" : "👁️"; 
+    });
+});
 </script>
 </body>
 </html>

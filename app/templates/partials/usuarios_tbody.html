@@ -18,6 +18,12 @@
                 data-bs-target="#modalEditarUsuario">
             Editar
         </button>
+        <button class="btn btn-danger btn-sm btn-eliminar-usuario"
+                data-user-id="{{ u.id }}"
+                data-bs-toggle="modal"
+                data-bs-target="#modalEliminarUsuario">
+            Eliminar
+        </button>
         {% else %}
         <span class="badge bg-secondary">Solo lectura</span>
         {% endif %}

@@ -15,6 +15,7 @@ from collections import defaultdict
 
 main = Blueprint('main', __name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'))
 
+
 def generar_token(email):
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
     return s.dumps(email, salt='email-confirmar')
@@ -147,6 +148,30 @@ def ranking_tbody():
     )
 
     return render_template("partials/ranking_tbody.html", ranking=ranking)
+
+@main.route('/admin/eliminar_usuario/<int:user_id>', methods=['POST'])
+def eliminar_usuario(user_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+    admin = User.query.get(session['user_id'])
+    if not admin or not admin.is_admin:
+        return jsonify({'success': False, 'message': 'Acceso denegado'}), 403
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'Usuario no encontrado'}), 404
+
+    try:
+        # Eliminar reservas asociadas primero (para evitar errores de FK)
+        Reserva.query.filter_by(user_id=user.id).delete()
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
 
 @main.route('/admin/usuario/<int:user_id>.json')
 def admin_get_usuario(user_id):

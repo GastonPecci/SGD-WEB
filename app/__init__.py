@@ -1,8 +1,8 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
+from flask_migrate import Migrate 
 from dotenv import load_dotenv
-from flask_migrate import Migrate
 import os
 
 # Cargar las variables del archivo .env
@@ -10,6 +10,7 @@ load_dotenv()
 
 db = SQLAlchemy()
 mail = Mail()
+migrate = Migrate()
 
 def create_app():
     app = Flask(__name__)
@@ -27,7 +28,8 @@ def create_app():
 
     mail.init_app(app)
     db.init_app(app)
-
+    migrate.init_app(app, db)
+    
     from .routes import main
     app.register_blueprint(main)
 

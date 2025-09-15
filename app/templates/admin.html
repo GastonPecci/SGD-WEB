@@ -80,9 +80,14 @@
         border-radius: 8px;
         margin: 2px;
     }
-    .footer-bottom{
-        margin-top: 20px;
-    }
+    .footer-bottom {
+            font-size: 0.85rem;
+            margin-top: 2rem;
+            opacity: 0.8;
+        }
+        .footer-bottom:hover {
+            opacity: 1;
+        }
         @media (min-width: 768px) {
             .btn-custom {
                 width: auto;
@@ -97,6 +102,50 @@
                 font-size: 1.8rem;
             }
         }
+    @media (max-width: 767px) {
+    body {
+        padding: 10px;
+        align-items: flex-start; /* que no quede todo centrado */
+    }
+
+    .bg-overlay {
+        max-width: 100% !important;
+        min-height: auto !important;
+        padding: 15px;
+    }
+
+    h2 {
+        font-size: 1.6rem;
+    }
+    h4 {
+        font-size: 1.2rem;
+    }
+
+    .btn-custom {
+        width: 100%;
+        margin-bottom: 8px;
+        font-size: 1rem;
+    }
+
+    .nav-tabs {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .nav-tabs .nav-link {
+        width: 100%;
+        margin-bottom: 5px;
+        text-align: center;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    /* Inputs y selects ocupan ancho completo */
+    .form-control, .form-select {
+        font-size: 0.9rem;
+    }
+}
     </style>
 </head>
 <body class="p-4">
@@ -360,6 +409,27 @@
     <div class="footer-bottom">
             <a style="color: #ffffff;text-decoration: none;" href="https://api.whatsapp.com/send?phone=5493825576888&text=Hola me gustaria obtener mas información."><p> Copyright&copy; 2025 | SGD-Web. Todos los derechos reservados.</p></a>
     </div>
+</div>
+<!-- Modal Eliminar Usuario -->
+<div class="modal fade" id="modalEliminarUsuario" tabindex="-1" aria-labelledby="modalEliminarUsuarioLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" id="formEliminarUsuario">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="modalEliminarUsuarioLabel">Eliminar Usuario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-dark">
+          ⚠️ ¿Estás seguro de que querés eliminar este usuario? 
+          <br><b>Se borrarán también todas sus reservas.</b>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Eliminar</button>
+        </div>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Modal eliminar reserva -->
@@ -690,33 +760,38 @@
             tbodyUsuarios.addEventListener('click', async (ev) => {
                 const btnBloquear = ev.target.closest('.btn-bloquear');
                 const btnEditar = ev.target.closest('.btn-editar-usuario');
+                const btnEliminar = ev.target.closest('.btn-eliminar-usuario');
                 if (btnBloquear) {
-                const userId = btnBloquear.getAttribute('data-user-id');
-                const resp = await fetch(`/admin/bloquear_usuario/${userId}`, { method: 'POST' });
-                const data = await resp.json();
-                if (data.success) {
-                    await actualizarUsuarios(); // refresca sólo la tabla
-                } else {
-                    alert(data.message || 'Error al bloquear/desbloquear.');
-                }
-                return;
-                }
+                    const userId = btnBloquear.getAttribute('data-user-id');
+                    const resp = await fetch(`/admin/bloquear_usuario/${userId}`, { method: 'POST' });
+                    const data = await resp.json();
+                    if (data.success) {
+                        await actualizarUsuarios(); // refresca sólo la tabla
+                    } else {
+                        alert(data.message || 'Error al bloquear/desbloquear.');
+                    }
+                    return;
+                    }
                 if (btnEditar) {
-                const userId = btnEditar.getAttribute('data-user-id');
-                // Traemos los datos del usuario actualizados
-                const resp = await fetch(`/admin/usuario/${userId}.json`);
-                const data = await resp.json();
-                if (!data.success) { alert('No se pudo cargar el usuario.'); return; }
-                // Llenar modal
-                document.getElementById('formEditarUsuario').setAttribute('action', `/admin/editar_usuario/${userId}`);
-                document.getElementById('editU_Staff').checked = !!data.is_staff;
-                document.getElementById('editU_Nombre').value = data.nombre || '';
-                document.getElementById('editU_Apellido').value = data.apellido || '';
-                document.getElementById('editU_Telefono').value = data.telefono || '';
-                document.getElementById('editU_Email').value = data.email || '';
-                document.getElementById('editU_Confirmado').checked = !!data.confirmado;
-                document.getElementById('editU_Admin').checked = !!data.is_admin;
-                document.getElementById('editU_Bloqueado').checked = !!data.bloqueado;
+                    const userId = btnEditar.getAttribute('data-user-id');
+                    // Traemos los datos del usuario actualizados
+                    const resp = await fetch(`/admin/usuario/${userId}.json`);
+                    const data = await resp.json();
+                    if (!data.success) { alert('No se pudo cargar el usuario.'); return; }
+                    // Llenar modal
+                    document.getElementById('formEditarUsuario').setAttribute('action', `/admin/editar_usuario/${userId}`);
+                    document.getElementById('editU_Staff').checked = !!data.is_staff;
+                    document.getElementById('editU_Nombre').value = data.nombre || '';
+                    document.getElementById('editU_Apellido').value = data.apellido || '';
+                    document.getElementById('editU_Telefono').value = data.telefono || '';
+                    document.getElementById('editU_Email').value = data.email || '';
+                    document.getElementById('editU_Confirmado').checked = !!data.confirmado;
+                    document.getElementById('editU_Admin').checked = !!data.is_admin;
+                    document.getElementById('editU_Bloqueado').checked = !!data.bloqueado;
+                }
+                if (btnEliminar) {
+                    const userId = btnEliminar.getAttribute('data-user-id');
+                    document.getElementById('formEliminarUsuario').setAttribute('action', `/admin/eliminar_usuario/${userId}`);
                 }
             });
         });
@@ -746,7 +821,21 @@
                 }
             });       
 
-            
+        // Submit del modal eliminar
+        document.getElementById('formEliminarUsuario').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const resp = await fetch(form.getAttribute('action'), { method: 'POST' });
+            const data = await resp.json();
+
+            if (data.success) {
+                await actualizarUsuarios();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('modalEliminarUsuario'));
+                modal && modal.hide();
+            } else {
+                alert(data.message || 'Error al eliminar usuario');
+            }
+        });    
 
         document.addEventListener('DOMContentLoaded', function () {
         const modalEditar = document.getElementById('modalEditarCancha');
