@@ -1,0 +1,53 @@
+<h4 class="mb-3">📦 Stock de Productos</h4>
+
+<div class="table-responsive">
+    <table class="table table-dark table-striped table-sm text-center align-middle">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Stock</th>
+                <th>Precio</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in productos %}
+            <tr>
+                <td>{{ p.nombre }}</td>
+                <td>{{ p.stock }}</td>
+                <td>${{ "%.2f"|format(p.precio) }}</td>
+                <td>
+                    {% if user.is_admin %}
+                    <!-- Editar stock -->
+                    <form action="{{ url_for('main.editar_producto', producto_id=p.id) }}" method="post" class="d-inline-block mb-2 mb-md-0">
+                        <div class="input-group input-group-sm">
+                            <input type="number" name="stock" value="{{ p.stock }}" min="0" class="form-control" style="max-width:80px;">
+                            <button type="submit" class="btn btn-warning">Actualizar</button>
+                        </div>
+                    </form>
+
+                    <!-- Sin stock -->
+                    <form action="{{ url_for('main.sin_stock', producto_id=p.id) }}" method="post" class="d-inline-block mb-2 mb-md-0">
+                        <button type="submit" class="btn btn-secondary btn-sm w-100">Sin stock</button>
+                    </form>
+
+                    <!-- Eliminar -->
+                    <form action="{{ url_for('main.eliminar_producto', producto_id=p.id) }}" method="post"
+                          class="d-inline-block"
+                          onsubmit="return confirm('¿Seguro que deseas eliminar este producto?');">
+                        <button type="submit" class="btn btn-danger btn-sm w-100">Eliminar</button>
+                    </form>
+                    {% else %}
+                    <span class="badge bg-secondary">Solo lectura</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4">No hay productos cargados.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+</div>

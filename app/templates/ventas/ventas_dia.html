@@ -1,0 +1,53 @@
+<h4 class="mb-3">📊 Ventas del Día</h4>
+{% if user.is_admin or user.is_staff %}
+<!-- Tabla de ventas -->
+<div class="table-responsive mb-3">
+    <table class="table table-dark table-striped table-sm text-center align-middle">
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Monto</th>
+                <th>Fecha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in ventas %}
+            <tr>
+                <td>{{ v.producto.nombre }}</td>
+                <td>{{ v.cantidad }}</td>
+                <td>${{ "%.2f"|format(v.producto.precio) }}</td>
+                <td>${{ "%.2f"|format(v.monto) }}</td>
+                <td>{{ v.fecha.strftime("%d/%m/%Y %H:%M") }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5">No hubo ventas registradas hoy.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Resumen -->
+<div class="row g-2">
+    <div class="col-12 col-md-6">
+        <div class="card bg-dark text-light shadow-sm">
+            <div class="card-body text-center">
+                <h5 class="card-title">Total de productos vendidos</h5>
+                <p class="card-text fs-4">{{ total_vendidos }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="card bg-dark text-light shadow-sm">
+            <div class="card-body text-center">
+                <h5 class="card-title">Recaudación total</h5>
+                <p class="card-text fs-4">${{ "%.2f"|format(total_recaudado) }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+

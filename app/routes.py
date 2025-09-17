@@ -1,6 +1,7 @@
 import os
+import json
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
-from .models import db, User, Cancha, Reserva
+from .models import db, User, Cancha, Reserva, Producto, Venta
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, date
 from itsdangerous import URLSafeTimedSerializer
@@ -11,6 +12,7 @@ from markupsafe import Markup
 from uuid import uuid4
 from sqlalchemy import func
 from collections import defaultdict
+
 
 
 main = Blueprint('main', __name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'))
@@ -119,35 +121,164 @@ def login():
                 return redirect(url_for('main.login'))
 
             if check_password_hash(user.password, password):
+                token = str(uuid4())  # Genera token único
+                user.session_token = token
+                db.session.commit()
+
                 session['user_id'] = user.id
+                session['session_token'] = token
+
                 flash("Sesión iniciada correctamente")
-                
                 if user.is_admin or user.is_staff:
                     return redirect(url_for('main.admin'))
                 else:
                     return redirect(url_for('main.index'))
+            
+    return render_template('login.html') 
+
+@main.before_app_request
+def verificar_sesion_unica():
+    if 'user_id' in session and 'session_token' in session:
+        user = User.query.get(session['user_id'])
+        if not user or user.session_token != session['session_token']:
+            session.clear()
+            flash("Tu sesión fue cerrada porque iniciaste en otro dispositivo.")
+            return redirect(url_for('main.login'))
+                   
+@main.route('/admin/ventas', methods=['GET'])
+def admin_ventas():
+    if 'user_id' not in session:
+        return redirect(url_for('main.login'))
+    user = User.query.get(session['user_id'])
+    if not (user.is_admin or user.is_staff):
+        return redirect(url_for('main.index'))
+
+    productos = Producto.query.all()
+    hoy = datetime.now().date()
+    ventas = Venta.query.filter(func.date(Venta.fecha) == hoy).all()
+    total_vendidos = sum(v.cantidad for v in ventas)
+    total_recaudado = sum(v.monto for v in ventas)
+
+    return render_template('admin.html',
+                           user=user,
+                           canchas=Cancha.query.all(),
+                           usuarios=User.query.all(),
+                           reservas=agrupar_reservas(Reserva.query.all()),
+                           productos=productos,
+                           ventas=ventas,
+                           total_vendidos=total_vendidos,
+                           total_recaudado=total_recaudado, active_tab=request.args.get("active_tab", "reservas"))
+
+
+@main.route('/admin/nueva_venta', methods=['POST'])
+def nueva_venta():
+    carrito_json = request.form.get("carrito")
+    if not carrito_json:
+        flash("No hay productos en la venta.")
+        return redirect(url_for("main.admin_ventas"))
+
+    try:
+        carrito = json.loads(carrito_json)
+    except Exception:
+        flash("Error procesando la venta.")
+        return redirect(url_for("main.admin_ventas"))
+
+    total = 0
+    for item in carrito:
+        producto = Producto.query.get(item["id"])
+        if not producto or producto.stock < item["cantidad"]:
+            flash(f"Stock insuficiente para {item['nombre']}.")
+            return redirect(url_for("main.admin_ventas"))
+
+        subtotal = producto.precio * item["cantidad"]
+        total += subtotal
+        producto.stock -= item["cantidad"]
+
+        venta = Venta(producto_id=producto.id, cantidad=item["cantidad"], monto=subtotal)
+        db.session.add(venta)
+
+    db.session.commit()
+    flash(f"Venta registrada con éxito. Total: ${total:.2f}")
+    return redirect(url_for("main.admin_ventas", active_tab="ventas"))
+
+
+@main.route('/admin/agregar_producto', methods=['POST'])
+def agregar_producto():
+    nombre = request.form.get('nombre')
+    stock = int(request.form.get('stock'))
+    precio = float(request.form.get('precio'))  # ✅ capturamos precio
+
+    producto = Producto(nombre=nombre, stock=stock, precio=precio)
+    db.session.add(producto)
+    db.session.commit()
+
+    flash("Producto agregado correctamente.")
+    return redirect(url_for('main.admin_ventas'))
+
+@main.route('/admin/editar_producto/<int:producto_id>', methods=['POST'])
+def editar_producto(producto_id):
+    
+    producto = Producto.query.get_or_404(producto_id)
+    nuevo_stock = request.form.get('stock')
+    if nuevo_stock is not None:
+        producto.stock = int(nuevo_stock)
+        db.session.commit()
+        flash("Stock actualizado correctamente.")
+    return redirect(url_for('main.admin_ventas'))
+
+
+@main.route('/admin/sin_stock/<int:producto_id>', methods=['POST'])
+def sin_stock(producto_id):
+    
+    producto = Producto.query.get_or_404(producto_id)
+    producto.stock = 0
+    db.session.commit()
+    flash(f"El producto '{producto.nombre}' fue marcado como sin stock.")
+    return redirect(url_for('main.admin_ventas'))
+
+
+@main.route('/admin/eliminar_producto/<int:producto_id>', methods=['POST'])
+def eliminar_producto(producto_id):
+    
+    producto = Producto.query.get_or_404(producto_id)
+
+    try:
+        # Eliminar ventas relacionadas
+        Venta.query.filter_by(producto_id=producto.id).delete()
         
-    return render_template('login.html')
+        # Eliminar producto
+        db.session.delete(producto)
+        db.session.commit()
+        flash("Producto y ventas asociadas eliminados correctamente.")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al eliminar producto: {str(e)}")
+
+    return redirect(url_for('main.admin_ventas'))
 
 @main.route("/admin/ranking_tbody")
 def ranking_tbody():
-    hace_un_mes = datetime.now() - timedelta(days=30)
-    
-    ranking = (
-        db.session.query(
-            User.nombre,
-            User.apellido,
-            func.count(Reserva.id).label("total")
+    try:
+        hace_un_mes = datetime.now() - timedelta(days=30)
+        ranking = (
+            db.session.query(
+                User.nombre,
+                User.apellido,
+                func.count(Reserva.id).label("total")
+            )
+            .join(Reserva, Reserva.user_id == User.id)
+            .filter(Reserva.fecha >= hace_un_mes)
+            .group_by(User.id)
+            .order_by(func.count(Reserva.id).desc())
+            .limit(20)
+            .all()
         )
-        .join(Reserva, Reserva.user_id == User.id)
-        .filter(Reserva.fecha >= hace_un_mes)
-        .group_by(User.id)
-        .order_by(func.count(Reserva.id).desc())
-        .limit(20)  # top 20
-        .all()
-    )
+        print("DEBUG Ranking:", ranking)  # 👈 log en consola del servidor
+        return render_template("partials/ranking_tbody.html", ranking=ranking)
+    except Exception as e:
+        print("ERROR en ranking:", str(e))
+        return f"<tr><td colspan='3'>Error: {str(e)}</td></tr>"
 
-    return render_template("partials/ranking_tbody.html", ranking=ranking)
 
 @main.route('/admin/eliminar_usuario/<int:user_id>', methods=['POST'])
 def eliminar_usuario(user_id):
@@ -275,8 +406,14 @@ def register():
 
 @main.route('/logout')
 def logout():
+    if 'user_id' in session:
+        user = User.query.get(session['user_id'])
+        if user:
+            user.session_token = None
+            db.session.commit()
     session.clear()
     return redirect(url_for('main.index'))
+
 
 @main.route('/admin')
 def admin():
@@ -289,6 +426,7 @@ def admin():
         
     canchas = Cancha.query.all()
     usuarios = User.query.all()
+    productos = Producto.query.all()
     fecha_str = request.args.get('fecha')
     if fecha_str:
         try:
@@ -300,7 +438,9 @@ def admin():
         reservas_raw = Reserva.query.order_by(Reserva.fecha.desc()).all()
         reservas = agrupar_reservas(reservas_raw)
 
-    return render_template('admin.html', canchas=canchas, user=user, reservas=reservas,usuarios=usuarios)
+    return render_template('admin.html', canchas=canchas, user=user, productos=productos, reservas=reservas,usuarios=usuarios,ventas=[],    
+    total_vendidos=0,
+    total_recaudado=0)
 
 @main.route('/confirmar/<token>')
 def confirmar_email(token):

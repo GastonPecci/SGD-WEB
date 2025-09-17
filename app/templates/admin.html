@@ -88,6 +88,19 @@
         .footer-bottom:hover {
             opacity: 1;
         }
+            #sugerenciasProductos {
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1050; /* para que quede arriba de otros elementos */
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        #sugerenciasProductos .list-group-item {
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         @media (min-width: 768px) {
             .btn-custom {
                 width: auto;
@@ -175,7 +188,12 @@
      {% if user.is_admin or user.is_staff %}
     <ul class="nav nav-tabs" id="adminTabs" role="tablist">
         <li class="nav-item">
-            <button class="nav-link active" id="reservas-tab" data-bs-toggle="tab" data-bs-target="#reservas" type="button" role="tab">📋 Reservas</button>
+            <button class="nav-link {% if active_tab == 'reservas' %}active{% endif %}" 
+                id="reservas-tab" data-bs-toggle="tab" data-bs-target="#reservas" type="button" role="tab">📋 Reservas</button>
+        </li>
+        <li class="nav-item">
+        <button class="nav-link {% if active_tab == 'ventas' %}active{% endif %}" 
+            id="ventas-tab" data-bs-toggle="tab" data-bs-target="#ventas" type="button" role="tab">💰 Ventas</button>
         </li>
         <li class="nav-item">
             <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">📌 Reserva Manual</button>
@@ -197,7 +215,7 @@
 
         <!-- 📋 Reservas -->
         {% if user.is_admin or user.is_staff %}
-        <div class="tab-pane fade  show active" id="reservas" role="tabpanel">
+        <div class="tab-pane fade {% if active_tab == 'reservas' %}show active{% endif %}" id="reservas" role="tabpanel">
             <form id="filtroFecha" class="row g-3 mb-3">
                 <div class="col-md-6">
                     <input type="date" name="fecha" class="form-control" value="{{ request.args.get('fecha', '') }}">
@@ -250,6 +268,57 @@
         </div>
         {% endif %}
 
+        <!-- 💰 Ventas -->
+    <div class="tab-pane fade {% if active_tab == 'ventas' %}show active{% endif %}" id="ventas" role="tabpanel">
+        <h3 class="mb-3">💰 Ventas</h3>
+
+    <!-- Subpestañas -->
+    <ul class="nav nav-pills mb-3" id="ventasTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="nueva-venta-tab" data-bs-toggle="tab" data-bs-target="#nueva-venta" type="button" role="tab">
+                📋 Registrar Nueva Venta
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="ventas-dia-tab" data-bs-toggle="tab" data-bs-target="#ventas-dia" type="button" role="tab">
+                📅 Ventas del Día
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="stock-tab" data-bs-toggle="tab" data-bs-target="#stock" type="button" role="tab">
+                📦 Stock de Productos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="agregar-producto-tab" data-bs-toggle="tab" data-bs-target="#agregar-producto" type="button" role="tab">
+                ➕ Agregar Nuevo Producto
+            </button>
+        </li>
+    </ul>
+    
+            <div class="tab-content">            
+            <!-- 📋 Registrar Nueva Venta -->
+            <div class="tab-pane fade show active" id="nueva-venta" role="tabpanel">
+                {% include 'ventas/nueva_venta.html' %}
+            </div>
+            
+            <!-- 📅 Ventas del Día -->
+            <div class="tab-pane fade" id="ventas-dia" role="tabpanel">
+                {% include 'ventas/ventas_dia.html' %}
+            </div>            
+            <!-- 📦 Stock de Productos -->
+            <div class="tab-pane fade" id="stock" role="tabpanel">
+                {% include 'ventas/stock.html' %}
+            </div>   
+            
+            <!-- ➕ Agregar Nuevo Producto -->
+            <div class="tab-pane fade" id="agregar-producto" role="tabpanel">
+                {% include 'ventas/agregar_producto.html' %}
+            </div>             
+                       
+        </div>        
+    </div>        
+           
         <!-- 🏟 Canchas -->
         {% if user.is_admin or user.is_staff %}
         <div class="tab-pane fade" id="canchas" role="tabpanel">
@@ -578,11 +647,119 @@
     </div>        
 </body>
 <script>
+        document.addEventListener("DOMContentLoaded", () => {
+        const inputBuscar = document.getElementById("buscarProducto");
+        const sugerencias = document.getElementById("sugerenciasProductos");
 
-    async function actualizarRanking() {
-    const res = await fetch('/admin/ranking_tbody');
-    document.getElementById('tablaRanking').innerHTML = await res.text();
+        inputBuscar.addEventListener("input", () => {
+            const termino = inputBuscar.value.toLowerCase().trim();
+            sugerencias.innerHTML = "";
+
+            if (termino.length < 1) return; // no mostrar nada si está vacío
+
+            const filtrados = productos.filter(p => 
+                p.nombre.toLowerCase().includes(termino)
+            );
+
+            filtrados.forEach(p => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = "list-group-item list-group-item-action";
+                item.textContent = `${p.nombre} (Stock: ${p.stock}) - $${p.precio.toFixed(2)}`;
+                item.onclick = () => {
+                    inputBuscar.value = p.nombre;
+                    sugerencias.innerHTML = "";
+                };
+                sugerencias.appendChild(item);
+            });
+        });
+    });
+
+    let carrito = [];
+
+    function agregarProducto() {
+        const nombre = document.getElementById("buscarProducto").value;
+        const cantidad = parseInt(document.getElementById("cantidadProducto").value);
+
+        if (!nombre || !cantidad || cantidad <= 0) {
+            alert("Seleccioná un producto y cantidad válida.");
+            return;
+        }
+
+        // Buscar producto en la lista de productos del backend (inyectados en la página)
+        const producto = productos.find(p => p.nombre === nombre);
+        if (!producto) {
+            alert("Producto no encontrado.");
+            return;
+        }
+
+        // Verificar stock
+        if (cantidad > producto.stock) {
+            alert("Stock insuficiente.");
+            return;
+        }
+
+        // Agregar al carrito
+        carrito.push({
+            id: producto.id,
+            nombre: producto.nombre,
+            cantidad: cantidad,
+            precio: producto.precio,
+            subtotal: cantidad * producto.precio
+        });
+
+        actualizarCarrito();
     }
+
+    function actualizarCarrito() {
+        const tbody = document.getElementById("tablaCarrito");
+        tbody.innerHTML = "";
+        let total = 0;
+
+        carrito.forEach((item, index) => {
+            total += item.subtotal;
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.nombre}</td>
+                    <td>${item.cantidad}</td>
+                    <td>$${item.precio.toFixed(2)}</td>
+                    <td>$${item.subtotal.toFixed(2)}</td>
+                    <td><button type="button" class="btn btn-sm btn-danger" onclick="eliminarProducto(${index})">❌</button></td>
+                </tr>
+            `;
+        });
+
+        document.getElementById("totalVenta").innerText = total.toFixed(2);
+        document.getElementById("inputCarrito").value = JSON.stringify(carrito);
+    }
+
+    function eliminarProducto(index) {
+        carrito.splice(index, 1);
+        actualizarCarrito();
+    }
+
+    // Inyectar lista de productos desde Flask
+    const productos = [
+        {% for p in productos %}
+        {id: {{p.id}}, nombre: "{{p.nombre}}", precio: {{p.precio}}, stock: {{p.stock}}},
+        {% endfor %}
+    ];
+
+     async function actualizarRanking() {
+        try {
+        const res = await fetch('/admin/ranking_tbody');
+        if (!res.ok) {
+            console.error("Error HTTP en ranking:", res.status, res.statusText);
+            return;
+        }
+        const html = await res.text();
+        document.getElementById('tablaRanking').innerHTML = html;
+        console.log("Ranking cargado:", html);
+    } catch (err) {
+        console.error("Error cargando ranking:", err);
+    }
+}
+    
 
     document.addEventListener("DOMContentLoaded", () => {
         // actualizar ranking al abrir la pestaña
