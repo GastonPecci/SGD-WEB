@@ -1,7 +1,17 @@
 {% for u in ranking %}
-<tr>
+<tr class="{% if u.total >= 5 %}table-success fw-bold{% endif %}">
     <td>{{ u.nombre }}</td>
     <td>{{ u.apellido }}</td>
     <td>{{ u.total }}</td>
+    <td>
+        {% if u.total >= 5 %}
+            <button class="btn btn-sm btn-warning btn-premio" 
+                    data-user-id="{{ u.id }}">
+                🎁 Dar premio
+            </button>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
 </tr>
 {% endfor %}

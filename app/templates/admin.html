@@ -101,6 +101,115 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        /* --- Estética profesional para pestaña Reservas --- */
+        /* --- Estética profesional para pestaña Reservas --- */
+#reservas h3 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #0dcaf0;
+    text-align: center;
+}
+
+#filtroFecha {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    margin-bottom: 1rem;
+}
+
+#filtroFecha input,
+#filtroFecha button,
+#filtroFecha a {
+    border-radius: 8px;
+}
+
+/* Tabla elegante */
+#reservas .table {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+#reservas thead th {
+    background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+    color: #fff;
+    text-align: center;
+    font-weight: 600;
+}
+
+#reservas tbody tr {
+    transition: all 0.3s ease;
+}
+#reservas tbody tr:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.01);
+}
+
+#reservas td, #reservas th {
+    vertical-align: middle;
+    text-align: center;
+    padding: 10px;
+}
+
+/* Botón eliminar más moderno */
+#reservas .btn-danger.btn-sm {
+    border-radius: 6px;
+    font-weight: 500;
+    padding: 5px 12px;
+    transition: all 0.3s ease;
+}
+#reservas .btn-danger.btn-sm:hover {
+    background: #bb2d3b;
+    transform: translateY(-2px);
+}
+
+/* --- Responsivo para pantallas chicas --- */
+@media (max-width: 767px) {
+    #filtroFecha {
+        padding: 10px;
+    }
+    #filtroFecha .col-md-6,
+    #filtroFecha .col-md-2 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    #filtroFecha button,
+    #filtroFecha a {
+        width: 100%;
+        margin-top: 5px;
+    }
+
+    #reservas .table {
+        font-size: 0.85rem;
+    }
+    #reservas thead {
+        display: none; /* Oculta encabezado en móviles */
+    }
+    #reservas tbody td {
+        display: block;
+        text-align: right;
+        padding: 8px;
+        border: none;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    #reservas tbody td::before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+        color: #0dcaf0;
+    }
+    #reservas tbody tr {
+        margin-bottom: 12px;
+        display: block;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 8px;
+    }
+}
+
+
         @media (min-width: 768px) {
             .btn-custom {
                 width: auto;
@@ -206,14 +315,14 @@
         </li>        
         <li class="nav-item">
             <button class="nav-link" id="usuarios-tab" data-bs-toggle="tab" data-bs-target="#usuarios" type="button" role="tab">👥 Usuarios</button>
-        </li>        
+        </li>              
     </ul>
     {% endif %}
 
 
     <div class="tab-content mt-3">
 
-        <!-- 📋 Reservas -->
+    <!-- 📋 Reservas -->
         {% if user.is_admin or user.is_staff %}
         <div class="tab-pane fade {% if active_tab == 'reservas' %}show active{% endif %}" id="reservas" role="tabpanel">
             <form id="filtroFecha" class="row g-3 mb-3">
@@ -241,11 +350,11 @@
                     <tbody id="tablaReservas">
                         {% for r in reservas %}
                         <tr>
-                            <td>{{ r.user.nombre }} {{ r.user.apellido }}</td>
-                            <td>{{ r.cancha.nombre }}</td>
-                            <td>{{ r.fecha.strftime('%d/%m/%Y') }}</td>
-                            <td>{{ r.horas }}</td>
-                            <td>
+                            <td data-label="Usuario">{{ r.user.nombre }} {{ r.user.apellido }}</td>
+                            <td data-label="Cancha">{{ r.cancha.nombre }}</td>
+                            <td data-label="Fecha">{{ r.fecha.strftime('%d/%m/%Y') }}</td>
+                            <td data-label="Hora">{{ r.horas }}</td>
+                            <td data-label="Acción">
                                 {% if user.is_admin %}
                                 <button type="button"
                                         class="btn btn-danger btn-sm"
@@ -267,7 +376,7 @@
             </div>
         </div>
         {% endif %}
-
+    
         <!-- 💰 Ventas -->
     <div class="tab-pane fade {% if active_tab == 'ventas' %}show active{% endif %}" id="ventas" role="tabpanel">
         <h3 class="mb-3">💰 Ventas</h3>
@@ -294,15 +403,18 @@
                 ➕ Agregar Nuevo Producto
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="ventas-mensual-tab" data-bs-toggle="tab" data-bs-target="#ventas-mensual" type="button" role="tab">📆 Ventas Mensual</button>
+        </li>  
     </ul>
     
-            <div class="tab-content">            
+        <div class="tab-content">            
             <!-- 📋 Registrar Nueva Venta -->
             <div class="tab-pane fade show active" id="nueva-venta" role="tabpanel">
                 {% include 'ventas/nueva_venta.html' %}
             </div>
             
-            <!-- 📅 Ventas del Día -->
+            <!-- 📅 Ventas del Día -->            
             <div class="tab-pane fade" id="ventas-dia" role="tabpanel">
                 {% include 'ventas/ventas_dia.html' %}
             </div>            
@@ -314,8 +426,12 @@
             <!-- ➕ Agregar Nuevo Producto -->
             <div class="tab-pane fade" id="agregar-producto" role="tabpanel">
                 {% include 'ventas/agregar_producto.html' %}
-            </div>             
-                       
+            </div>
+            <!-- 📆 Ventas Mensual -->
+            <div class="tab-pane fade" id="ventas-mensual" role="tabpanel">
+                {% include 'ventas/ventas_mensual.html' %}
+            </div>            
+                     
         </div>        
     </div>        
            
@@ -442,6 +558,7 @@
                             <th>Nombre</th>
                             <th>Apellido</th>
                             <th>Total Reservas</th>
+                            <th>Premio</th>
                         </tr>
                     </thead>
                     <tbody id="tablaRanking">
@@ -646,7 +763,49 @@
     
     </div>        
 </body>
+
 <script>
+    
+      async function actualizarVentasDia() {
+        try {
+            const res = await fetch('/admin/ventas_dia_tbody');
+            if (!res.ok) return;
+            const html = await res.text();
+            document.querySelector('#contenidoVentasDia').innerHTML = html;
+        } catch (err) {
+            console.error("Error cargando ventas del día:", err);
+        }
+    }
+
+    async function actualizarVentasMensual() {
+        try {
+            const res = await fetch('/admin/ventas_mensual_tbody');
+            if (!res.ok) return;
+            const html = await res.text();
+            document.querySelector('#contenidoVentasMensual').innerHTML = html;
+        } catch (err) {
+            console.error("Error cargando ventas mensuales:", err);
+        }
+    }
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Cargar ventas al abrir sus pestañas
+    const ventasDiaTab = document.getElementById("ventas-dia-tab");
+    if (ventasDiaTab) {
+        ventasDiaTab.addEventListener("shown.bs.tab", actualizarVentasDia);
+    }
+
+    const ventasMensualTab = document.getElementById("ventas-mensual-tab");
+    if (ventasMensualTab) {
+        ventasMensualTab.addEventListener("shown.bs.tab", actualizarVentasMensual);
+    }
+
+    // También cargarlas apenas abre el panel de ventas
+    if (document.getElementById("ventas").classList.contains("active")) {
+        actualizarVentasDia();
+        actualizarVentasMensual();
+    }
+});
         document.addEventListener("DOMContentLoaded", () => {
         const inputBuscar = document.getElementById("buscarProducto");
         const sugerencias = document.getElementById("sugerenciasProductos");
@@ -664,9 +823,29 @@
             filtrados.forEach(p => {
                 const item = document.createElement("button");
                 item.type = "button";
-                item.className = "list-group-item list-group-item-action";
-                item.textContent = `${p.nombre} (Stock: ${p.stock}) - $${p.precio.toFixed(2)}`;
+                item.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+
+                // Texto principal
+                item.innerHTML = `<span>${p.nombre}</span> <span>Stock: ${p.stock} — $${p.precio.toFixed(2)}</span>`;
+
+                if (p.stock === 0) {
+                    item.classList.add("list-group-item-danger"); // fondo rojo
+                    item.disabled = true; // no se puede seleccionar
+                    item.innerHTML = `<span>🔒 ${p.nombre}</span> <span>Sin stock</span>`;
+                } else if (p.stock <= 5) {
+                    item.classList.add("list-group-item-warning"); // fondo amarillo
+                }
+
                 item.onclick = () => {
+                    if (p.stock === 0) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Producto sin stock',
+                            text: `El producto "${p.nombre}" no está disponible.`,
+                            confirmButtonText: 'Ok'
+                        });
+                        return;
+                    }
                     inputBuscar.value = p.nombre;
                     sugerencias.innerHTML = "";
                 };
@@ -693,9 +872,15 @@
             return;
         }
 
-        // Verificar stock
+        // Verificar stock con SweetAlert2
         if (cantidad > producto.stock) {
-            alert("Stock insuficiente.");
+            Swal.fire({
+                icon: 'error',
+                title: '⚠️ Stock insuficiente',
+                text: `El producto "${producto.nombre}" solo tiene ${producto.stock} unidades disponibles.`,
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#d33'
+            });
             return;
         }
 
@@ -708,7 +893,22 @@
             subtotal: cantidad * producto.precio
         });
 
+        // 👇 Aviso si queda poco stock
+        if (producto.stock <= 5) {
+            Swal.fire({
+                icon: 'warning',
+                title: '⚠️ Stock bajo',
+                text: `El producto "${producto.nombre}" tiene solo ${producto.stock} unidades. Reponer pronto.`,
+                confirmButtonColor: '#f39c12'
+            });
+        }
+
         actualizarCarrito();
+
+        // 👇 Limpiar campos
+        document.getElementById("buscarProducto").value = "";
+        document.getElementById("cantidadProducto").value = "";
+        document.getElementById("buscarProducto").focus();
     }
 
     function actualizarCarrito() {
@@ -745,8 +945,8 @@
         {% endfor %}
     ];
 
-     async function actualizarRanking() {
-        try {
+    async function actualizarRanking() {
+    try {
         const res = await fetch('/admin/ranking_tbody');
         if (!res.ok) {
             console.error("Error HTTP en ranking:", res.status, res.statusText);
@@ -754,12 +954,27 @@
         }
         const html = await res.text();
         document.getElementById('tablaRanking').innerHTML = html;
-        console.log("Ranking cargado:", html);
+
+        // 👇 Buscar si hay algún usuario con 5 o más reservas
+        const filas = document.querySelectorAll("#tablaRanking tr");
+        filas.forEach(fila => {
+            const total = parseInt(fila.children[2]?.innerText) || 0;
+            if (total >= 5) {
+                const nombre = fila.children[0].innerText + " " + fila.children[1].innerText;
+                Swal.fire({
+                    icon: 'info',
+                    title: '🎉 Premio disponible',
+                    text: `${nombre} alcanzó ${total} reservas. ¡Podés regalarle un turno gratis!`,
+                    confirmButtonText: 'Ok',
+                    confirmButtonColor: '#28a745'
+                });
+            }
+        });
+
     } catch (err) {
         console.error("Error cargando ranking:", err);
     }
-}
-    
+}    
 
     document.addEventListener("DOMContentLoaded", () => {
         // actualizar ranking al abrir la pestaña
@@ -768,6 +983,60 @@
             rankingTabBtn.addEventListener("shown.bs.tab", actualizarRanking);
         }
 
+        // delegación de eventos: escuchar clicks en los botones de premio
+        document.getElementById("tablaRanking").addEventListener("click", async (e) => {
+            const btn = e.target.closest(".btn-premio");
+            if (!btn) return;
+
+            const userId = btn.getAttribute("data-user-id");
+
+            const { value: formValues } = await Swal.fire({
+                title: "🎁 Dar turno gratis",
+                html: `
+                    <input type="date" id="premioFecha" class="swal2-input" required>
+                    <input type="time" id="premioHora" class="swal2-input" required>
+                `,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: "Regalar",
+                cancelButtonText: "Cancelar",
+                preConfirm: () => {
+                    const fecha = document.getElementById("premioFecha").value;
+                    const hora = document.getElementById("premioHora").value;
+                    if (!fecha || !hora) {
+                        Swal.showValidationMessage("Seleccioná fecha y hora");
+                        return false;
+                    }
+                    return { fecha, hora };
+                }
+            });
+
+            if (formValues) {
+                try {
+                    const resp = await fetch(`/admin/dar_premio/${userId}`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(formValues)
+                    });
+                    const data = await resp.json();
+
+                    Swal.fire({
+                        icon: data.success ? "success" : "error",
+                        title: data.success ? "Premio registrado" : "Error",
+                        text: data.message || ""
+                    });
+
+                    if (data.success) {
+                        actualizarRanking(); // refresca tabla
+                    }
+                } catch (err) {
+                    console.error("Error al dar premio:", err);
+                    Swal.fire("Error", "No se pudo registrar el premio", "error");
+                }
+            }
+        });
+
+    
         // refrescar cada 60 segundos
         setInterval(() => {
             if (document.getElementById("ranking").classList.contains("active")) {
@@ -880,8 +1149,17 @@
             }
             const res = await fetch(url);
             document.getElementById('tablaReservas').innerHTML = await res.text();
-        }
 
+            aplicarDataLabelsReservas();
+        }
+        function aplicarDataLabelsReservas() {
+            const headers = ["Usuario", "Cancha", "Fecha", "Hora", "Acción"];
+            document.querySelectorAll("#tablaReservas tr").forEach(row => {
+                row.querySelectorAll("td").forEach((cell, i) => {
+                    cell.setAttribute("data-label", headers[i] || "");
+                });
+            });
+        }
         // Aplica el filtro y selecciona la fila guardada
         function aplicarFiltroYSeleccion() {
             const filtro = document.getElementById('buscarUsuario').value.toLowerCase();

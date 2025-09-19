@@ -72,23 +72,31 @@ def agrupar_reservas(reservas):
     agrupadas = {}
 
     for r in reservas:
-        clave = (r.user, r.cancha, r.fecha)  # guardamos objetos, no solo IDs
+        clave = (r.user, r.cancha, r.fecha)
         if clave not in agrupadas:
             agrupadas[clave] = []
-        if r.hora and ":" in r.hora:
+
+        if r.tipo_reserva == "premio":
+            agrupadas[clave].append("Premio")
+        elif r.hora and ":" in r.hora:
             agrupadas[clave].append(r.hora)
 
     resultado = []
     for (user, cancha, fecha), horas in agrupadas.items():
-        horas_filtradas = [h for h in horas if h and ":" in h]
-        horas_ordenadas = sorted(horas_filtradas, key=lambda h: int(h.split(":")[0])) if horas_filtradas else []
-
-        if len(horas_ordenadas) >= 12:
-            hora_str = "Día completo"
-        elif len(horas_ordenadas) > 1:
-            hora_str = ", ".join(horas_ordenadas)
+        if "Premio" in horas:
+            hora_str = "Premio"
         else:
-            hora_str = horas_ordenadas[0] if horas_ordenadas else "-"
+            horas_filtradas = [h for h in horas if h and ":" in h]
+            horas_ordenadas = sorted(
+                horas_filtradas, key=lambda h: int(h.split(":")[0])
+            ) if horas_filtradas else []
+
+            if len(horas_ordenadas) >= 12:
+                hora_str = "Día completo"
+            elif len(horas_ordenadas) > 1:
+                hora_str = ", ".join(horas_ordenadas)
+            else:
+                hora_str = horas_ordenadas[0] if horas_ordenadas else "-"
 
         resultado.append({
             "user": user,
@@ -97,7 +105,10 @@ def agrupar_reservas(reservas):
             "horas": hora_str
         })
 
+    # 👇 ORDENAR por fecha descendente y luego por hora
+    resultado.sort(key=lambda x: (x["fecha"], x["horas"]), reverse=True)
     return resultado
+
 
 @main.route('/')
 def index():        
@@ -155,19 +166,63 @@ def admin_ventas():
 
     productos = Producto.query.all()
     hoy = datetime.now().date()
+
+    # Ventas del día
     ventas = Venta.query.filter(func.date(Venta.fecha) == hoy).all()
     total_vendidos = sum(v.cantidad for v in ventas)
     total_recaudado = sum(v.monto for v in ventas)
 
-    return render_template('admin.html',
-                           user=user,
-                           canchas=Cancha.query.all(),
-                           usuarios=User.query.all(),
-                           reservas=agrupar_reservas(Reserva.query.all()),
-                           productos=productos,
-                           ventas=ventas,
-                           total_vendidos=total_vendidos,
-                           total_recaudado=total_recaudado, active_tab=request.args.get("active_tab", "reservas"))
+    # 🔹 Ventas mensuales agrupadas por mes, día, producto
+    primer_dia_mes = hoy.replace(day=1)
+    ventas_raw = (
+        Venta.query.filter(Venta.fecha >= primer_dia_mes)
+        .join(Producto)
+        .order_by(Venta.fecha)
+        .all()
+    )
+
+    # Estructura: {mes: {dia: {"total": X, "productos": [(nombre, cantidad, monto), ...]}}}    
+    ventas_mensuales = defaultdict(lambda: defaultdict(lambda: {"total": 0, "productos": defaultdict(lambda: {"cantidad": 0, "monto": 0})}))
+
+    for v in ventas_raw:
+        mes = v.fecha.strftime("%B %Y")
+        dia = v.fecha.strftime("%d/%m/%Y")
+
+        ventas_mensuales[mes][dia]["total"] += v.monto
+        ventas_mensuales[mes][dia]["productos"][v.producto.nombre]["cantidad"] += v.cantidad
+        ventas_mensuales[mes][dia]["productos"][v.producto.nombre]["monto"] += v.monto
+
+    # Convertir defaultdict a listas ordenadas por cantidad (para el template)
+    ventas_mensuales_final = {}
+    for mes, dias in ventas_mensuales.items():
+        total_mes = 0
+        ventas_mensuales_final[mes] = {"total": 0, "dias": {}}
+        for dia, data in dias.items():
+            productos_ordenados = sorted(
+                data["productos"].items(),
+                key=lambda x: x[1]["cantidad"],
+                reverse=True
+            )
+            ventas_mensuales_final[mes]["dias"][dia] = {
+                "total": data["total"],
+                "productos": productos_ordenados
+            }
+            total_mes += data["total"]
+        ventas_mensuales_final[mes]["total"] = total_mes
+
+    return render_template(
+        'admin.html',
+        user=user,
+        canchas=Cancha.query.all(),
+        usuarios=User.query.all(),
+        reservas=agrupar_reservas(Reserva.query.all()),
+        productos=productos,
+        ventas=ventas,
+        total_vendidos=total_vendidos,
+        total_recaudado=total_recaudado,
+        ventas_mensuales=ventas_mensuales_final,
+        active_tab=request.args.get("active_tab", "ventas")
+    )
 
 
 @main.route('/admin/nueva_venta', methods=['POST'])
@@ -256,28 +311,88 @@ def eliminar_producto(producto_id):
 
     return redirect(url_for('main.admin_ventas'))
 
+@main.route('/admin/iniciar_dia_venta', methods=['POST'])
+def iniciar_dia_venta():
+    session['ventas_abiertas'] = True
+    flash("Día de ventas iniciado ✅")
+    return redirect(url_for("main.admin_ventas", active_tab="ventas"))
+
+
+@main.route('/admin/cerrar_dia_venta', methods=['POST'])
+def cerrar_dia_venta():
+    hoy = datetime.now().date()
+    ventas_dia = Venta.query.filter(func.date(Venta.fecha) == hoy).all()
+
+    if not ventas_dia:
+        flash("No hay ventas para cerrar hoy.")
+        return redirect(url_for("main.admin_ventas", active_tab="ventas"))
+
+    # Opcional: podrías marcar estas ventas como "cerradas"
+    for v in ventas_dia:
+        v.cerrada = True  # requiere que tu modelo Venta tenga un campo 'cerrada' (boolean)
+    db.session.commit()
+
+    flash("Día de ventas cerrado. Las ventas fueron movidas a la pestaña mensual.")
+    return redirect(url_for("main.admin_ventas", active_tab="ventas"))
+
+
 @main.route("/admin/ranking_tbody")
 def ranking_tbody():
     try:
         hace_un_mes = datetime.now() - timedelta(days=30)
+
         ranking = (
-            db.session.query(
+            User.query
+            .with_entities(
+                User.id,
                 User.nombre,
                 User.apellido,
-                func.count(Reserva.id).label("total")
+                func.coalesce(User.contador_reservas, 0).label("total")
             )
-            .join(Reserva, Reserva.user_id == User.id)
-            .filter(Reserva.fecha >= hace_un_mes)
-            .group_by(User.id)
-            .order_by(func.count(Reserva.id).desc())
+            .order_by(func.coalesce(User.contador_reservas, 0).desc())
             .limit(20)
             .all()
         )
-        print("DEBUG Ranking:", ranking)  # 👈 log en consola del servidor
+
+        print("DEBUG Ranking:", ranking)
         return render_template("partials/ranking_tbody.html", ranking=ranking)
+
     except Exception as e:
         print("ERROR en ranking:", str(e))
         return f"<tr><td colspan='3'>Error: {str(e)}</td></tr>"
+
+
+@main.route('/admin/dar_premio/<int:user_id>', methods=['POST'])
+def dar_premio(user_id):
+    user = User.query.get_or_404(user_id)
+
+    data = request.get_json()
+    fecha_str = data.get("fecha")
+    hora = data.get("hora")
+
+    if not fecha_str or not hora:
+        return jsonify({"success": False, "message": "Debés seleccionar fecha y hora"}), 400
+
+    fecha = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+
+    # Crear la reserva de premio
+    premio = Reserva(
+        user_id=user.id,
+        cancha_id=1,  # ⚠️ ajustá según la cancha
+        fecha=fecha,
+        hora=hora,
+        tipo_reserva="premio"
+    )
+    db.session.add(premio)
+    user.contador_reservas = 0  # Reiniciar contador de reservas  
+    
+
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "message": f"Se registró un turno gratis para {user.nombre} {user.apellido}."
+    })
 
 
 @main.route('/admin/eliminar_usuario/<int:user_id>', methods=['POST'])
@@ -427,20 +542,23 @@ def admin():
     canchas = Cancha.query.all()
     usuarios = User.query.all()
     productos = Producto.query.all()
+
     fecha_str = request.args.get('fecha')
     if fecha_str:
         try:
             fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            reservas = Reserva.query.filter(Reserva.fecha == fecha).order_by(Reserva.hora).all()
+            reservas_raw = Reserva.query.filter(Reserva.fecha == fecha).order_by(Reserva.hora).all()
         except ValueError:
-            reservas = Reserva.query.order_by(Reserva.fecha.desc()).all()
+            reservas_raw = []
     else:
         reservas_raw = Reserva.query.order_by(Reserva.fecha.desc()).all()
-        reservas = agrupar_reservas(reservas_raw)
+
+    reservas = agrupar_reservas(reservas_raw)
+        
 
     return render_template('admin.html', canchas=canchas, user=user, productos=productos, reservas=reservas,usuarios=usuarios,ventas=[],    
     total_vendidos=0,
-    total_recaudado=0)
+    total_recaudado=0, ventas_mensuales=[])
 
 @main.route('/confirmar/<token>')
 def confirmar_email(token):
@@ -563,7 +681,9 @@ def reservas():
             cancha_id=cancha.id,
             fecha=fecha,
             hora=hora )
+        
         db.session.add(reserva)
+        user.contador_reservas = (user.contador_reservas or 0) + 1
         db.session.commit()
         
         enviar_email_reserva(user.email, cancha.nombre, fecha, hora)
@@ -619,17 +739,17 @@ def reserva_manual():
             hora = request.form['hora']
             db.session.add(Reserva(user_id=user.id, cancha_id=cancha_id, fecha=fecha, hora=hora))
             horas_creadas.append(hora)
-
+            user.contador_reservas = (user.contador_reservas or 0) + 1
         elif tipo == "varias":
             horas = request.form.getlist('horas[]')
             for h in horas:
                 db.session.add(Reserva(user_id=user.id, cancha_id=cancha_id, fecha=fecha, hora=h))
             horas_creadas.extend(horas)
-
+            user.contador_reservas = (user.contador_reservas or 0) + 1
         elif tipo == "dia":
             reservas_existentes = Reserva.query.filter_by(cancha_id=cancha_id, fecha=fecha).all()
             horas_ocupadas = {r.hora for r in reservas_existentes}
-
+            user.contador_reservas = (user.contador_reservas or 0) + 1
             # 🚫 Caso 1: si ya hay todas las horas ocupadas → ya hay un día completo reservado
             if len(horas_ocupadas) >= len(HORAS_TODAS):
                 return jsonify({'success': False, 'message': 'Ese día ya está reservado completamente.'})
@@ -800,6 +920,69 @@ def admin_reservas_tbody():
     user = User.query.get(session['user_id']) if 'user_id' in session else None
     return render_template('partials/reservas_tbody.html', reservas=reservas, user=user)
 
+@main.route('/admin/ventas_dia_tbody')
+def ventas_dia_tbody():
+    hoy = datetime.now().date()
+    ventas = Venta.query.filter(func.date(Venta.fecha) == hoy).all()
+    total_vendidos = sum(v.cantidad for v in ventas)
+    total_recaudado = sum(v.monto for v in ventas)
+    user = User.query.get(session['user_id']) if 'user_id' in session else None
+    return render_template(
+        'ventas/ventas_dia.html',
+        ventas=ventas,
+        total_vendidos=total_vendidos,
+        total_recaudado=total_recaudado,
+        user=user
+    )
+
+
+@main.route('/admin/ventas_mensual_tbody')
+def ventas_mensual_tbody():
+    hoy = datetime.now().date()
+    primer_dia_mes = hoy.replace(day=1)
+
+    ventas_raw = (
+        Venta.query.filter(Venta.fecha >= primer_dia_mes)
+        .join(Producto)
+        .order_by(Venta.fecha)
+        .all()
+    )
+
+    
+    ventas_mensuales = defaultdict(lambda: defaultdict(lambda: {
+        "total": 0,
+        "productos": defaultdict(lambda: {"cantidad": 0, "monto": 0})
+    }))
+
+    for v in ventas_raw:
+        mes = v.fecha.strftime("%B %Y")
+        dia = v.fecha.strftime("%d/%m/%Y")
+        ventas_mensuales[mes][dia]["total"] += v.monto
+        ventas_mensuales[mes][dia]["productos"][v.producto.nombre]["cantidad"] += v.cantidad
+        ventas_mensuales[mes][dia]["productos"][v.producto.nombre]["monto"] += v.monto
+
+    ventas_mensuales_final = {}
+    for mes, dias in ventas_mensuales.items():
+        total_mes = 0
+        ventas_mensuales_final[mes] = {"total": 0, "dias": {}}
+        for dia, data in dias.items():
+            productos_ordenados = sorted(
+                data["productos"].items(),
+                key=lambda x: x[1]["cantidad"],
+                reverse=True
+            )
+            ventas_mensuales_final[mes]["dias"][dia] = {
+                "total": data["total"],
+                "productos": productos_ordenados
+            }
+            total_mes += data["total"]
+        ventas_mensuales_final[mes]["total"] = total_mes
+
+    return render_template(
+        'ventas/ventas_mensual.html',
+        ventas_mensuales=ventas_mensuales_final
+    )
+
 
 @main.route('/admin/buscar_usuario')
 def buscar_usuario():
@@ -820,6 +1003,8 @@ def buscar_usuario():
         })
 
     return jsonify({})
+
+
 
 @main.route('/agenda')
 def agenda():

@@ -7,6 +7,8 @@ class User(db.Model):
     apellido = db.Column(db.String(100))
     email = db.Column(db.String(120), unique=True)
     password = db.Column(db.String(200))
+    ultimo_premio = db.Column(db.DateTime, nullable=True)
+    contador_reservas = db.Column(db.Integer, default=0, nullable=False)
     telefono = db.Column(db.String(20))
     is_admin = db.Column(db.Boolean, default=False)
     confirmado = db.Column(db.Boolean, default=False)    
@@ -26,7 +28,7 @@ class Reserva(db.Model):
     cancha_id = db.Column(db.Integer, db.ForeignKey('cancha.id'), nullable=False)
     fecha = db.Column(db.Date, nullable=False)
     hora = db.Column(db.String(5), nullable=False)
-
+    tipo_reserva = db.Column(db.String(20), default="normal")  
     user = db.relationship('User', backref=db.backref('reservas', lazy=True))
     cancha = db.relationship('Cancha', backref=db.backref('reservas', lazy=True))
 

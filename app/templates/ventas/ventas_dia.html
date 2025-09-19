@@ -1,53 +1,73 @@
-<h4 class="mb-3">📊 Ventas del Día</h4>
+<div id="contenidoVentasDia">
 {% if user.is_admin or user.is_staff %}
-<!-- Tabla de ventas -->
-<div class="table-responsive mb-3">
-    <table class="table table-dark table-striped table-sm text-center align-middle">
-        <thead>
-            <tr>
+
+<!-- Resumen -->
+<div class="row g-2 mb-3">
+  <div class="col-12 col-md-6">
+    <div class="card bg-dark text-light shadow-sm">
+      <div class="card-body text-center">
+        <h5 class="card-title">Total de productos vendidos</h5>
+        <p class="card-text fs-4">{{ total_vendidos }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="card bg-dark text-light shadow-sm">
+      <div class="card-body text-center">
+        <h5 class="card-title">Recaudación total</h5>
+        <p class="card-text fs-4">${{ "%.2f"|format(total_recaudado) }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Ventas del día en acordeón -->
+<div class="accordion" id="accordionVentasHoy">
+  <div class="accordion-item bg-dark text-light border-secondary">
+    <h2 class="accordion-header" id="headingVentas">
+      <button class="accordion-button collapsed bg-primary text-white" type="button"
+              data-bs-toggle="collapse" data-bs-target="#collapseVentas"
+              aria-expanded="false" aria-controls="collapseVentas">
+        🛒 Ventas registradas hoy
+      </button>
+    </h2>
+    <div id="collapseVentas" class="accordion-collapse collapse"
+         aria-labelledby="headingVentas" data-bs-parent="#accordionVentasHoy">
+      <div class="accordion-body">
+        {% if ventas %}
+        <div class="table-responsive">
+          <table class="table table-dark table-striped table-sm text-center align-middle">
+            <thead>
+              <tr>
                 <th>Producto</th>
                 <th>Cantidad</th>
                 <th>Precio Unitario</th>
                 <th>Monto</th>
                 <th>Fecha</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for v in ventas %}
-            <tr>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in ventas|sort(attribute="fecha", reverse=True) %}
+              <tr>
                 <td>{{ v.producto.nombre }}</td>
                 <td>{{ v.cantidad }}</td>
                 <td>${{ "%.2f"|format(v.producto.precio) }}</td>
                 <td>${{ "%.2f"|format(v.monto) }}</td>
                 <td>{{ v.fecha.strftime("%d/%m/%Y %H:%M") }}</td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="5">No hubo ventas registradas hoy.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div class="alert alert-warning mb-0">
+            ⚠️ No hubo ventas registradas hoy.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- Resumen -->
-<div class="row g-2">
-    <div class="col-12 col-md-6">
-        <div class="card bg-dark text-light shadow-sm">
-            <div class="card-body text-center">
-                <h5 class="card-title">Total de productos vendidos</h5>
-                <p class="card-text fs-4">{{ total_vendidos }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-md-6">
-        <div class="card bg-dark text-light shadow-sm">
-            <div class="card-body text-center">
-                <h5 class="card-title">Recaudación total</h5>
-                <p class="card-text fs-4">${{ "%.2f"|format(total_recaudado) }}</p>
-            </div>
-        </div>
-    </div>
-    {% endif %}
+{% endif %}
 </div>
-

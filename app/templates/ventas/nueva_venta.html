@@ -1,3 +1,11 @@
+<div class="d-flex justify-content-between mb-3">
+    <form method="POST" action="{{ url_for('main.iniciar_dia_venta') }}">
+        <button type="submit" class="btn btn-primary">▶️ Iniciar Día de Ventas</button>
+    </form>
+    <form method="POST" action="{{ url_for('main.cerrar_dia_venta') }}">
+        <button type="submit" class="btn btn-danger">⏹️ Cerrar Día de Ventas</button>
+    </form>
+</div>
 <h4 class="mb-3">📋 Registrar Nueva Venta</h4>
 
 <!-- Fila de búsqueda y cantidad -->
