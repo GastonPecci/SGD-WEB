@@ -764,18 +764,30 @@
     </div>        
 </body>
 <script>
-    setInterval(async () => {
-        try {
-            const res = await fetch("/api/check_session");
-            const data = await res.json();
-            if (!data.valid) {
-                alert("Tu sesión fue cerrada porque iniciaste en otro dispositivo.");
+     setInterval(async () => {
+    try {
+        const res = await fetch("/api/check_session");
+        const data = await res.json();
+        if (!data.valid) {
+            const modalElement = document.getElementById('mensajeModal');
+            const contenido = document.getElementById('mensajeContenido');
+            contenido.innerHTML = `
+                <div class="text-center">
+                    <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:2rem;"></i>
+                    <p class="mt-3">Tu sesión fue cerrada porque iniciaste en otro dispositivo.</p>
+                </div>`;
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+
+            // 🔥 Redirigir automáticamente después de 3 segundos
+            setTimeout(() => {
                 window.location.href = "/login";
-            }
-        } catch (e) {
-            console.error("Error verificando sesión:", e);
+            }, 3000);
         }
-    }, 10000); // cada 15 segundos
+    } catch (e) {
+        console.error("Error verificando sesión:", e);
+    }
+}, 10000); // cada 10 segundos
 </script>
 <script>
     
