@@ -174,7 +174,20 @@ def verificar_sesion_unica():
             user.last_seen = datetime.utcnow()
             db.session.commit()
 
-                   
+@main.route('/api/check_session')
+def check_session():
+    user_id = session.get('user_id')
+    token = session.get('session_token')
+
+    if not user_id or not token:
+        return jsonify({"valid": False})
+
+    user = User.query.get(user_id)
+    if not user or user.session_token != token:
+        return jsonify({"valid": False})
+    return jsonify({"valid": True})
+
+
 @main.route('/admin/ventas', methods=['GET'])
 def admin_ventas():
     if 'user_id' not in session:

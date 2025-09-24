@@ -273,5 +273,19 @@
     }
   });
 </script>
+<script>
+setInterval(async () => {
+    try {
+        const res = await fetch("/api/check_session");
+        const data = await res.json();
+        if (!data.valid) {
+            alert("Tu sesión fue cerrada porque iniciaste en otro dispositivo.");
+            window.location.href = "/login";
+        }
+    } catch (e) {
+        console.error("Error verificando sesión:", e);
+    }
+}, 10000); // cada 15 segundos
+</script>
 </body>
 </html>
