@@ -119,21 +119,27 @@ def index():
     return render_template('index.html', canchas=canchas, user=user)
 
 @main.route('/login', methods=['GET', 'POST'])
-def login():    
+def login():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
         user = User.query.filter_by(email=email).first()
+
         if user and user.bloqueado:
             return render_template('login.html', error="Tu cuenta está bloqueada. Contacta con administración.")
+        
         if user:
             if not user.confirmado:
                 flash(Markup(f"No confirmaste tu cuenta. <a href='{url_for('main.reenviar_confirmacion', email=user.email)}' class='alert-link'>Reenviar correo</a>"))
                 return redirect(url_for('main.login'))
 
             if check_password_hash(user.password, password):
-                token = str(uuid4())  # Genera token único
+                # 🔥 Nuevo inicio → invalida todo lo viejo
+                session.clear()
+
+                token = str(uuid4())
                 user.session_token = token
+                user.last_seen = datetime.utcnow()
                 db.session.commit()
 
                 session['user_id'] = user.id
@@ -144,17 +150,30 @@ def login():
                     return redirect(url_for('main.admin'))
                 else:
                     return redirect(url_for('main.index'))
-            
-    return render_template('login.html') 
+
+        flash("Correo o contraseña incorrectos")
+        return redirect(url_for('main.login'))
+
+    return render_template('login.html')
+
 
 @main.before_app_request
 def verificar_sesion_unica():
-    if 'user_id' in session and 'session_token' in session:
-        user = User.query.get(session['user_id'])
-        if not user or user.session_token != session['session_token']:
+    user_id = session.get('user_id')
+    token = session.get('session_token')
+
+    if user_id and token:
+        user = User.query.get(user_id)
+        if not user or user.session_token != token:
+            # 🚫 Token inválido → cerrar sesión
             session.clear()
             flash("Tu sesión fue cerrada porque iniciaste en otro dispositivo.")
             return redirect(url_for('main.login'))
+        else:
+            # 🔄 Actualizamos actividad
+            user.last_seen = datetime.utcnow()
+            db.session.commit()
+
                    
 @main.route('/admin/ventas', methods=['GET'])
 def admin_ventas():
