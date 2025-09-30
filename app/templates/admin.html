@@ -164,7 +164,54 @@
     background: #bb2d3b;
     transform: translateY(-2px);
 }
+#usuarios h3 {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #0dcaf0;
+    text-align: center;
+}
 
+/* Tabla elegante */
+#usuarios .table {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    background: rgba(255,255,255,0.05);
+}
+
+#usuarios thead th {
+    background: linear-gradient(135deg, #0d6efd, #0dcaf0);
+    color: #fff;
+    text-align: center;
+    font-weight: 600;
+}
+
+#usuarios tbody tr {
+    transition: all 0.3s ease;
+}
+#usuarios tbody tr:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.01);
+}
+
+#usuarios td, #usuarios th {
+    vertical-align: middle;
+    text-align: center;
+    padding: 10px;
+    border-color: rgba(255,255,255,0.1);
+}
+
+/* Botones de acciones más modernos */
+#usuarios .btn {
+    border-radius: 6px;
+    font-weight: 500;
+    padding: 5px 12px;
+    transition: all 0.3s ease;
+}
+#usuarios .btn:hover {
+    transform: translateY(-2px);
+}
 /* --- Responsivo para pantallas chicas --- */
 @media (max-width: 767px) {
     #filtroFecha {
@@ -201,6 +248,29 @@
         color: #0dcaf0;
     }
     #reservas tbody tr {
+        margin-bottom: 12px;
+        display: block;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 8px;
+    }
+    #usuarios thead {
+        display: none; /* Oculta encabezado en móviles */
+    }
+    #usuarios tbody td {
+        display: block;
+        text-align: right;
+        padding: 8px;
+        border: none;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    #usuarios tbody td::before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+        color: #0dcaf0;
+    }
+    #usuarios tbody tr {
         margin-bottom: 12px;
         display: block;
         border: 1px solid rgba(255,255,255,0.1);
@@ -266,6 +336,46 @@
     /* Inputs y selects ocupan ancho completo */
     .form-control, .form-select {
         font-size: 0.9rem;
+    }
+    #filtroFecha {
+        padding: 10px;
+    }
+    #filtroFecha .col-md-6,
+    #filtroFecha .col-md-2 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    #filtroFecha button,
+    #filtroFecha a {
+        width: 100%;
+        margin-top: 5px;
+    }
+
+    #reservas .table {
+        font-size: 0.85rem;
+    }
+    #reservas thead {
+        display: none; /* Oculta encabezado en móviles */
+    }
+    #reservas tbody td {
+        display: block;
+        text-align: right;
+        padding: 8px;
+        border: none;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    #reservas tbody td::before {
+        content: attr(data-label);
+        float: left;
+        font-weight: bold;
+        color: #0dcaf0;
+    }
+    #reservas tbody tr {
+        margin-bottom: 12px;
+        display: block;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 8px;
     }
 }
     </style>
@@ -355,7 +465,15 @@
                             <td data-label="Fecha">{{ r.fecha.strftime('%d/%m/%Y') }}</td>
                             <td data-label="Hora">{{ r.horas }}</td>
                             <td data-label="Acción">
-                                {% if user.is_admin %}
+                                {% if user.is_admin %} 
+                                <!-- 📲 Botón WhatsApp -->
+                                {% if r.user.telefono %}
+                                <a class="btn btn-success btn-sm"
+                                target="_blank"
+                                href="https://api.whatsapp.com/send?phone=54{{ r.user.telefono }}&text=Hola%20{{ r.user.nombre }}%2C%20te%20recordamos%20tu%20reserva%20en%20la%20cancha%20{{ r.cancha.nombre }}%20para%20el%20{{ r.fecha.strftime('%d/%m/%Y') }}%20a%20las%20{{ r.horas }}.">
+                                    📲 Recordar
+                                </a>
+                                {% endif %}                                                               
                                 <button type="button"
                                         class="btn btn-danger btn-sm"
                                         data-bs-toggle="modal"
@@ -764,6 +882,55 @@
     </div>        
 </body>
 <script>
+async function enviarRecordatorio(reservaId) {
+    try {
+        const res = await fetch(`/admin/enviar_recordatorio/${reservaId}`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: '📲 Enviar Recordatorio',
+                text: 'Presione Abrir Whatsapp para enviar.',
+                confirmButtonText: 'Abrir WhatsApp'
+            }).then(async () => {
+                window.open(data.link, '_blank');
+                // 👇 actualizar tabla sin recargar toda la página
+                await actualizarReservas();
+            });
+
+        } else if (data.message && data.message.includes("ya fue enviado")) {
+            Swal.fire({
+                icon: 'info',
+                title: '⚠️ Ya enviado',
+                text: 'Este recordatorio ya había sido marcado como enviado.',
+                confirmButtonText: 'Entendido'
+            }).then(async () => {
+                // refrescar tabla por si otro admin ya lo envió
+                await actualizarReservas();
+            });
+
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: data.message || 'No se pudo enviar el recordatorio.'
+            });
+        }
+    } catch (err) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de conexión',
+            text: 'No se pudo contactar con el servidor.'
+        });
+        console.error("Error en enviarRecordatorio:", err);
+    }
+}
+
+
+</script>
+
+<script>
      setInterval(async () => {
     try {
         const res = await fetch("/api/check_session");
@@ -1019,7 +1186,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 title: "🎁 Dar turno gratis",
                 html: `
                     <input type="date" id="premioFecha" class="swal2-input" required>
-                    <input type="time" id="premioHora" class="swal2-input" required>
+                    <input type="time" id="premioHora" class="swal2-input" step="3600" required>
                 `,
                 focusConfirm: false,
                 showCancelButton: true,
@@ -1214,7 +1381,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setInterval(() => {
                 actualizarUsuarios();
                 actualizarReservas();
-            }, 10000);
+            }, 5000);
             });
 
             // Función busqueda de usuarios

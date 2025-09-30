@@ -28,7 +28,8 @@ class Reserva(db.Model):
     cancha_id = db.Column(db.Integer, db.ForeignKey('cancha.id'), nullable=False)
     fecha = db.Column(db.Date, nullable=False)
     hora = db.Column(db.String(5), nullable=False)
-    tipo_reserva = db.Column(db.String(20), default="normal")  
+    tipo_reserva = db.Column(db.String(20), default="normal")
+    recordatorio_enviado = db.Column(db.Boolean, default=False)  
     user = db.relationship('User', backref=db.backref('reservas', lazy=True))
     cancha = db.relationship('Cancha', backref=db.backref('reservas', lazy=True))
 

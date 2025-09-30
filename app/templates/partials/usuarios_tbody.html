@@ -1,28 +1,40 @@
 {% for u in usuarios %}
 <tr data-user-id="{{ u.id }}">
-    <td>{{ u.nombre or '' }}</td>
-    <td>{{ u.apellido or '' }}</td>
-    <td>{{ u.telefono or '' }}</td>
-    <td>{{ u.email or '' }}</td>
-    <td>{{ 'Sí' if u.confirmado else 'No' }}</td>
-    <td>{{ 'Sí' if u.is_admin else 'No' }}</td>
-    <td>
-        <a href="https://wa.me/{{ u.telefono }}" target="_blank" class="btn btn-success btn-sm">WhatsApp</a>
+    <td data-label="Nombre">{{ u.nombre or '' }}</td>
+    <td data-label="Apellido">{{ u.apellido or '' }}</td>
+    <td data-label="Teléfono">{{ u.telefono or '' }}</td>
+    <td data-label="Email">{{ u.email or '' }}</td>
+    <td data-label="Confirmado">
+        {% if u.confirmado %}
+            <span class="badge bg-success">✅ Sí</span>
+        {% else %}
+            <span class="badge bg-danger">❌ No</span>
+        {% endif %}
+    </td>
+    <td data-label="Admin">
+        {% if u.is_admin %}
+            <span class="badge bg-primary">👑</span>
+        {% else %}
+            <span class="badge bg-secondary">—</span>
+        {% endif %}
+    </td>
+    <td data-label="Acciones">
+        <a href="https://wa.me/{{ u.telefono }}" target="_blank" class="btn btn-success btn-sm">📲 WhatsApp</a>
         {% if user.is_admin %}
         <button class="btn btn-warning btn-sm btn-bloquear" data-user-id="{{ u.id }}">
-            {{ 'Desbloquear' if u.bloqueado else 'Bloquear' }}
+            {{ '🔓 Desbloquear' if u.bloqueado else '🔒 Bloquear' }}
         </button>
         <button class="btn btn-info btn-sm btn-editar-usuario"
                 data-user-id="{{ u.id }}"
                 data-bs-toggle="modal"
                 data-bs-target="#modalEditarUsuario">
-            Editar
+            ✏️ Editar
         </button>
         <button class="btn btn-danger btn-sm btn-eliminar-usuario"
                 data-user-id="{{ u.id }}"
                 data-bs-toggle="modal"
                 data-bs-target="#modalEliminarUsuario">
-            Eliminar
+            🗑 Eliminar
         </button>
         {% else %}
         <span class="badge bg-secondary">Solo lectura</span>

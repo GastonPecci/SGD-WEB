@@ -1,24 +1,46 @@
-    {% for r in reservas %}
-        <tr>
-            <td>{{ r.user.nombre }} {{ r.user.apellido }}</td>
-            <td>{{ r.cancha.nombre }}</td>
-            <td>{{ r.fecha.strftime('%d/%m/%Y') }}</td>
-            <td>{{ r.horas }}</td>
-            <td>
-            {% if user.is_admin %}
-            <button type="button"
-                    class="btn btn-danger btn-sm"
-                    data-bs-toggle="modal"
-                    data-bs-target="#modalEliminarReserva"
-                    data-user="{{ r.user.id }}"
-                    data-cancha="{{ r.cancha.id }}"
-                    data-fecha="{{ r.fecha.strftime('%Y-%m-%d') }}">
-                Eliminar
-            </button>
+{% for r in reservas %}
+    <tr>
+        <td>{{ r.user.nombre }} {{ r.user.apellido }}</td>
+        <td>{{ r.cancha.nombre }}</td>
+        <td>{{ r.fecha.strftime('%d/%m/%Y') }}</td>
+        <td>{{ r.horas }}</td>
+        <td>
+    {% if user.is_admin %}
+        {% if not r.recordatorio_enviado %}
+            {% if r.tipo_reserva == "premio" %}
+                <button type="button"
+                        class="btn btn-warning btn-sm"
+                        onclick="enviarRecordatorio({{ r.id }})">
+                    🎁 Recordar Premio
+                </button>
             {% else %}
-                <span class="badge bg-secondary">Solo lectura</span>
+                <button type="button"
+                        class="btn btn-success btn-sm"
+                        onclick="enviarRecordatorio({{ r.id }})">
+                    📲 Recordar
+                </button>
             {% endif %}
-            </td>
-        </tr>
-    {% endfor %}    
+        {% else %}
+            {% if r.tipo_reserva == "premio" %}
+                <span class="badge bg-success">🎁 Enviado</span>
+            {% else %}
+                <span class="badge bg-success">✅ Enviado</span>
+            {% endif %}
+        {% endif %}
 
+        <button type="button"
+                class="btn btn-danger btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#modalEliminarReserva"
+                data-user="{{ r.user.id }}"
+                data-cancha="{{ r.cancha.id }}"
+                data-fecha="{{ r.fecha.strftime('%Y-%m-%d') }}">
+            Eliminar
+        </button>
+    {% else %}
+        <span class="badge bg-secondary">Solo lectura</span>
+    {% endif %}
+</td>
+
+    </tr>
+{% endfor %}

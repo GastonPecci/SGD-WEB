@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from .models import db, User, Cancha, Reserva, Producto, Venta
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -17,6 +18,28 @@ from collections import defaultdict
 
 main = Blueprint('main', __name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'))
 
+def normalizar_telefono(telefono: str, prefijo_por_defecto="54") -> str:
+    """
+    Limpia y estandariza un número de teléfono para WhatsApp.
+    - Elimina caracteres no numéricos.
+    - Asegura que comience con código de país (por defecto 54).
+    """
+    if not telefono:
+        return ""
+
+    # Eliminar todo lo que no sea dígito
+    numero = re.sub(r"\D", "", telefono)
+
+    # Si ya empieza con código de país (ej: 54, 549, 598, etc.), lo dejamos
+    if numero.startswith(prefijo_por_defecto):
+        return numero
+
+    # Si empieza con "0" (prefijo local en Argentina), lo quitamos y anteponemos código país
+    if numero.startswith("0"):
+        numero = numero[1:]
+
+    # Anteponemos el prefijo por defecto
+    return prefijo_por_defecto + numero
 
 def generar_token(email):
     s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
@@ -72,17 +95,28 @@ def agrupar_reservas(reservas):
     agrupadas = {}
 
     for r in reservas:
-        clave = (r.user, r.cancha, r.fecha)
+        # 👇 clave extendida: incluye el tipo de reserva
+        clave = (r.user, r.cancha, r.fecha, r.tipo_reserva)
+
         if clave not in agrupadas:
-            agrupadas[clave] = []
+            agrupadas[clave] = {"horas": [], "recordatorio": False, "premio": False, "id": r.id}
+
+        # Guardamos el id (usamos el último para botones)
+        agrupadas[clave]["id"] = r.id
 
         if r.tipo_reserva == "premio":
-            agrupadas[clave].append("Premio")
+            agrupadas[clave]["horas"].append("Premio")
+            agrupadas[clave]["premio"] = True
         elif r.hora and ":" in r.hora:
-            agrupadas[clave].append(r.hora)
+            agrupadas[clave]["horas"].append(r.hora)
+
+        if r.recordatorio_enviado:
+            agrupadas[clave]["recordatorio"] = True
 
     resultado = []
-    for (user, cancha, fecha), horas in agrupadas.items():
+    for (user, cancha, fecha, tipo_reserva), data in agrupadas.items():
+        horas = data["horas"]
+
         if "Premio" in horas:
             hora_str = "Premio"
         else:
@@ -99,13 +133,15 @@ def agrupar_reservas(reservas):
                 hora_str = horas_ordenadas[0] if horas_ordenadas else "-"
 
         resultado.append({
+            "id": data["id"],
             "user": user,
             "cancha": cancha,
             "fecha": fecha,
-            "horas": hora_str
+            "horas": hora_str,
+            "recordatorio_enviado": data["recordatorio"],
+            "tipo_reserva": "premio" if data["premio"] else "normal"
         })
 
-    # 👇 ORDENAR por fecha descendente y luego por hora
     resultado.sort(key=lambda x: (x["fecha"], x["horas"]), reverse=True)
     return resultado
 
@@ -483,7 +519,8 @@ def filtrar_reservas():
 
     reservas = agrupar_reservas(reservas_raw)
     user = User.query.get(session['user_id']) if 'user_id' in session else None
-    return render_template('admin_reservas_parciales.html', reservas=reservas, user=user)
+    return render_template('partials/reservas_tbody.html', reservas=reservas, user=user)
+
 
 @main.route('/admin/bloquear_usuario/<int:user_id>', methods=['POST'])
 def admin_bloquear_usuario(user_id):
@@ -726,6 +763,41 @@ def reservas():
 
     return render_template('reservas.html', user=user, canchas=canchas, reservas=reservas_usuario)
 
+@main.route('/admin/enviar_recordatorio/<int:reserva_id>', methods=['POST'])
+def enviar_recordatorio(reserva_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    admin = User.query.get(session['user_id'])
+    if not (admin.is_admin or admin.is_staff):
+        return jsonify({'success': False, 'message': 'Acceso denegado'}), 403
+
+    reserva = Reserva.query.get_or_404(reserva_id)
+    
+    if reserva.recordatorio_enviado:
+        return jsonify({'success': False, 'message': 'El recordatorio ya fue enviado.'})
+
+    # Generar link de WhatsApp
+    telefono = reserva.user.telefono
+    if not telefono:
+        return jsonify({'success': False, 'message': 'El usuario no tiene teléfono registrado.'})
+
+    telefono = normalizar_telefono(telefono, "54")
+
+    if reserva.tipo_reserva == "premio":
+        mensaje = f"🎁 Hola {reserva.user.nombre}, tenés un PREMIO: un turno GRATIS en SGD-Web {reserva.cancha.nombre} el {reserva.fecha.strftime('%d/%m/%Y')} a las {reserva.hora}. ¡Que lo disfrutes!¡Por favor CONFIRMAR ASISTENCIA!"
+    else:
+        mensaje = f"Hola {reserva.user.nombre}, te recordamos tu reserva en SGD-Web {reserva.cancha.nombre} para el {reserva.fecha.strftime('%d/%m/%Y')} a las {reserva.hora}."
+
+    # Mejor usar urllib.parse.quote para evitar problemas con tildes/emoji
+    from urllib.parse import quote
+    mensaje_encoded = quote(mensaje)
+
+    link = f"https://api.whatsapp.com/send?phone={telefono}&text={mensaje_encoded}"
+
+    reserva.recordatorio_enviado = True
+    db.session.commit()
+
+    return jsonify({'success': True, 'link': link})
 
 @main.route('/admin/reserva_manual', methods=['POST'])
 def reserva_manual():
@@ -836,42 +908,61 @@ def eliminar_cancha(id):
 
 @main.route('/admin/eliminar_reserva/<int:id>', methods=['POST'])
 def eliminar_reserva(id):
-    if 'user_id' not in session:
-        return redirect(url_for('main.login'))
-    user = User.query.get(session['user_id'])
-    if not user:
-        return redirect(url_for('main.index'))
+    try:
+        fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
+        # Buscar todas las reservas de ese usuario, cancha y fecha
+        reservas = Reserva.query.filter_by(user_id=user_id, cancha_id=cancha_id, fecha=fecha).all()
+        
+        if not reservas:
+            flash("No se encontró la reserva.", "danger")
+            return redirect(url_for("main.index"))
 
-    reserva = Reserva.query.get(id)
-    if reserva:
-        db.session.delete(reserva)
+        for r in reservas:
+            db.session.delete(r)
+
+        # 🔥 Actualizar ranking → disminuir contador_reservas
+        user = User.query.get(user_id)
+        if user and user.contador_reservas and user.contador_reservas > 0:
+            user.contador_reservas -= len(reservas)
+
         db.session.commit()
-        flash('Reserva eliminada correctamente.')
-    else:
-        flash('Reserva no encontrada.')
+        flash("Reserva eliminada correctamente.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al eliminar la reserva: {str(e)}", "danger")
 
-    return redirect(url_for('main.admin'))
+    # Redirigir según desde dónde se eliminó
+    if request.referrer and "admin" in request.referrer:
+        return redirect(url_for("main.admin", active_tab="reservas"))
+    return redirect(url_for("main.reservas"))
 
 @main.route('/admin/eliminar_reserva_grupo/<int:user_id>/<int:cancha_id>/<fecha>', methods=['POST'])
 def eliminar_reserva_grupo(user_id, cancha_id, fecha):
-    if 'user_id' not in session:
-        return redirect(url_for('main.login'))
-    admin = User.query.get(session['user_id'])
-    if not admin.is_admin:
-        return redirect(url_for('main.index'))
-
     try:
-        fecha_dt = datetime.strptime(fecha, "%Y-%m-%d").date()
-        reservas = Reserva.query.filter_by(user_id=user_id, cancha_id=cancha_id, fecha=fecha_dt).all()
+        fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
+        reservas = Reserva.query.filter_by(user_id=user_id, cancha_id=cancha_id, fecha=fecha).all()
+
+        if not reservas:
+            flash("No se encontraron reservas para eliminar.", "danger")
+            return redirect(url_for("main.admin", active_tab="reservas"))
+
+        cantidad_eliminadas = len(reservas)
+
         for r in reservas:
             db.session.delete(r)
+
+        # 🔥 actualizar ranking del usuario
+        user = User.query.get(user_id)
+        if user and user.contador_reservas and user.contador_reservas > 0:
+            user.contador_reservas = max(0, user.contador_reservas - cantidad_eliminadas)
+
         db.session.commit()
-        flash("Reservas eliminadas con éxito.")
+        flash("Reserva eliminada con éxito.", "success")
     except Exception as e:
         db.session.rollback()
-        flash(f"Error eliminando reservas: {str(e)}")
+        flash(f"Error al eliminar la reserva: {str(e)}", "danger")
 
-    return redirect(url_for('main.admin'))
+    return redirect(url_for("main.admin", active_tab="reservas"))
 
 @main.route('/reservas/eliminar/<int:user_id>/<int:cancha_id>/<fecha>', methods=['POST'])
 def eliminar_reserva_usuario(user_id, cancha_id, fecha):

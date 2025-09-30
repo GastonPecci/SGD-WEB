@@ -79,7 +79,7 @@
 <body>
 <div class="bg-overlay">
     <h2>Crear Cuenta</h2>
-    <form method="POST">
+    <form method="POST" id="form-register">
         <div class="mb-3 text-start">
             <label for="nombre">Nombre</label>
             <input type="text" name="nombre" id="nombre" class="form-control" required>
@@ -105,7 +105,7 @@
                 </button>
             </div>
         </div>
-        <button class="btn btn-success btn-custom">Registrarse</button>
+        <button class="btn btn-success btn-custom" id="btn-register">Registrarse</button>
         <div class="text-center mt-3">
             <a href="{{ url_for('main.login') }}" class="btn btn-link">¿Ya tienes cuenta? Inicia sesión</a>
         </div>
@@ -153,6 +153,17 @@
       modal.show();
     }
   });
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("form-register");
+    const btn = document.getElementById("btn-register");
+
+    form.addEventListener("submit", function () {
+        btn.disabled = true;               // 🔒 deshabilita el botón
+        btn.innerText = "Procesando...";   // cambia el texto
+    });
+});
 </script>
 </body>
 
